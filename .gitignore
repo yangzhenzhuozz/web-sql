@@ -1,0 +1,5 @@
+dist
+node_modules
+src/dfaData.json
+src/SQLParser.ts
+package-lock.json
