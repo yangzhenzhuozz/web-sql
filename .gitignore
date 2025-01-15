@@ -1,5 +1,5 @@
 dist
 node_modules
 src/dfaData.json
-src/SQLParser.ts
+src/tools/SQLParser.ts
 package-lock.json

@@ -9,6 +9,8 @@ let rules: LexerRule<YYTOKEN>[] = [
   {reg: 'where',handler: function (text) {return {yytext: 'where',type: text,value: text,};},}, // prettier-ignore
   {reg: ',',handler: function (text) {return {yytext: ',',type: text,value: text,};},}, // prettier-ignore
   {reg: 'as',handler: function (text) {return {yytext: 'as',type: text,value: text,};},}, // prettier-ignore
+  {reg: '\\*',handler: function (text) {return {yytext: '*',type: text,value: text,};},}, // prettier-ignore
+  {reg: '\\.',handler: function (text) {return {yytext: '.',type: text,value: text,};},}, // prettier-ignore
   {reg: '\\+',handler: function (text) {return {yytext: '\\+',type: text,value: text,};},}, // prettier-ignore
   {reg: '\\-',handler: function (text) {return {yytext: '\\-',type: text,value: text,};},}, // prettier-ignore
   {reg: '\\*',handler: function (text) {return {yytext: '\\*',type: text,value: text,};},}, // prettier-ignore
@@ -30,9 +32,15 @@ let rules: LexerRule<YYTOKEN>[] = [
   {reg: 'having',handler: function (text) {return {yytext: 'having',type: text,value: text,};},}, // prettier-ignore
   {reg: 'limit',handler: function (text) {return {yytext: 'limit',type: text,value: text,};},}, // prettier-ignore
   // prettier-ignore
-  {reg: '[a-z][a-zA-Z0-9]*',handler: function (text) {return {yytext: text,type: 'id',value: text,};},}, //id的优先级最低,避免把关键字识别成id
+  {reg: '[_a-z][a-zA-Z0-9]*',handler: function (text) {return {yytext: text,type: 'id',value: text,};},}, //id的优先级最低,避免把关键字识别成id
   {
-    reg: '[0-9]+.[0-9]+',
+    reg: '[0-9]+\\.[0-9]+',
+    handler: function (text) {
+      return { yytext: text, type: 'number', value: Number(text) };
+    },
+  },
+  {
+    reg: '[0-9]+',
     handler: function (text) {
       return { yytext: text, type: 'number', value: Number(text) };
     },
@@ -45,4 +53,20 @@ let rules: LexerRule<YYTOKEN>[] = [
   },
 ];
 let dfa = genDFA(rules);
+function test() {
+  let code = '1\n';
+  dfa.setSource(code);
+  let finished = false;
+  dfa.endHandler = () => {
+    finished = true;
+  };
+  while (1) {
+    let ret = dfa.run();
+    console.log(ret);
+    if (finished) {
+      break;
+    }
+  }
+}
+// test();
 fs.writeFileSync('src/dfaData.json', JSON.stringify(dfa.serialize()));
