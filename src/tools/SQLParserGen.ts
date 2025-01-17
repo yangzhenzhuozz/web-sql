@@ -33,6 +33,10 @@ function gen() {
           action: function ($): DataSet<any> {
             let select_clause = $[0] as SelectList;
             let tableView = $[2] as DataSet<any>;
+            let where_clause = $[3] as ExpNode | undefined;
+            if (where_clause) {
+              tableView = tableView.where(where_clause);
+            }
             if (select_clause.type == '*') {
               return tableView;
             } else {
@@ -127,10 +131,36 @@ function gen() {
           },
         },
       },
-      { 'tableView:( query ) as  id': {} },
-      { 'where_clause:': {} },
-      { 'where_clause:where where_condition': {} },
-      { 'where_condition:exp': {} },
+      {
+        'tableView:( query ) as  id': {
+          action: function ($): DataSet<any> {
+            let query = $[1] as DataSet<any>;
+            let id = $[4] as string;
+            return query.alias(id);
+          },
+        },
+      },
+      {
+        'where_clause:': {
+          action: function () {
+            //什么也不做
+          },
+        },
+      },
+      {
+        'where_clause:where where_condition': {
+          action: function ($, stack): ExpNode {
+            return $[1] as ExpNode;
+          },
+        },
+      },
+      {
+        'where_condition:exp': {
+          action: function ($): ExpNode {
+            return $[0] as ExpNode;
+          },
+        },
+      },
       { 'group_clause:': {} },
       { 'group_clause:group by group_list having_clause': {} },
       { 'group_list:group_item , group_list': {} },
@@ -335,16 +365,92 @@ function gen() {
           },
         },
       },
-      { 'exp:if exp then exp else exp end': {} },
-      { 'exp:if exp then exp elseif_list else exp end': {} },
-      { 'elseif_list:elseif_list elseif_item': {} },
-      { 'elseif_list:elseif_item': {} },
-      { 'elseif_item:elseif exp then exp': {} },
-      { 'exp:id ( argu_list )': {} },
-      { 'argu_list:ε': {} },
-      { 'argu_list:argu_item , argu_list': {} },
-      { 'argu_list:argu_item': {} },
-      { 'argu_item:exp': {} },
+      {
+        'exp:if exp then exp else exp end': {
+          action: function ($): ExpNode {
+            let condition = $[1] as ExpNode;
+            let exp1 = $[3] as ExpNode;
+            let exp2 = $[5] as ExpNode;
+            return {
+              op: 'if-else',
+              children: [condition, exp1, exp2],
+            };
+          },
+        },
+      },
+      {
+        'exp:if exp then exp elseif_list else exp end': {
+          action: function ($): ExpNode {
+            let condition = $[1] as ExpNode;
+            let exp1 = $[3] as ExpNode;
+            let elseif_list = $[4] as ExpNode[];
+            let else_exp = $[6] as ExpNode;
+            return {
+              op: 'if-elseif-else',
+              children: [condition, exp1, ...elseif_list, else_exp],
+            };
+          },
+        },
+      },
+      {
+        'elseif_list:elseif_list elseif_item': {
+          action: function ($): ExpNode[] {
+            let elseif_list = $[0] as ExpNode[];
+            let elseif_item = $[1] as ExpNode[];
+            return [...elseif_list, ...elseif_item];
+          },
+        },
+      },
+      {
+        'elseif_list:elseif_item': {
+          action: function ($): ExpNode[] {
+            return $[0] as ExpNode[];
+          },
+        },
+      },
+      {
+        'elseif_item:elseif exp then exp': {
+          action: function ($): ExpNode[] {
+            let exp = $[1] as ExpNode;
+            let else_exp = $[3] as ExpNode;
+            return [exp, else_exp];
+          },
+        },
+      },
+      {
+        'exp:id ( argu_list )': {
+          action: function ($): ExpNode {
+            return {
+              op: 'call',
+              value: $[0] as string,
+              children: $[2] as ExpNode[],
+            };
+          },
+        },
+      },
+      {
+        'argu_list:ε': {
+          action: function ($): ExpNode[] {
+            return [];
+          },
+        },
+      },
+      {
+        'argu_list:argu_list , exp': {
+          action: function ($): ExpNode[] {
+            let argu_list = $[0] as ExpNode[];
+            let exp = $[2] as ExpNode;
+            return [...argu_list, exp];
+          },
+        },
+      },
+      {
+        'argu_list:exp': {
+          action: function ($): ExpNode[] {
+            return [$[0] as ExpNode];
+          },
+        },
+      },
     ],
   };
   let tscc = new TSCC(grammar, { debug: false, language: 'zh-cn' });

@@ -6,20 +6,22 @@ export interface FieldType {
   type: 'string' | 'number' | 'bigint' | 'boolean' | 'symbol' | 'undefined' | 'object' | 'function';
 }
 export class DataSet<T extends { [key: string]: any }> {
-  public schema: FieldType[] = [];
   private schemaIdx: { [key: string]: string } = {};
   public data: T[] = [];
   public name?: string;
+  public udf: { [key: string]: (...args: any[]) => ExpNode } = {
+    concat: (...args: any[]) => {
+      return {
+        op: 'immediate_string',
+        value: `调用了函数concat,参数为${args}`,
+      };
+    },
+  };
   public constructor(arr: T[], name?: string) {
     this.name = name;
-    this.schema = [];
     for (let k in arr[0]) {
       let fieldName = `${name ?? ''}.${k}`;
       this.schemaIdx[fieldName] = k;
-      this.schema.push({
-        name: fieldName,
-        type: typeof arr[0][k],
-      });
     }
     this.data = arr;
   }
@@ -186,6 +188,60 @@ export class DataSet<T extends { [key: string]: any }> {
           value: valor,
           targetName: String(valor),
         };
+      case 'if-else':
+        let if_else_condition = this.execExp(children![0], row);
+        let if_else_targetName = `if ${if_else_condition.targetName}`;
+        if (if_else_condition.value!) {
+          let ret = this.execExp(children![1], row);
+          if_else_targetName += ret.targetName;
+          ret.targetName = if_else_targetName;
+          return ret;
+        } else {
+          let ret = this.execExp(children![2], row);
+          if_else_targetName += ret.targetName;
+          ret.targetName = if_else_targetName;
+          return ret;
+        }
+      case 'if-elseif-else':
+        let if_else_if_ret: ExpNode | undefined = undefined;
+        let if_else_if_targetName = 'if ';
+        for (let i = 0; i < children!.length - 2; i += 2) {
+          let condition = this.execExp(children![i], row);
+          if_else_if_targetName += ' ' + condition.targetName;
+          if (condition.value!) {
+            if_else_if_ret = this.execExp(children![i + 1], row);
+            if_else_if_targetName += ' ' + if_else_if_ret.targetName;
+            break;
+          }
+        }
+        if (if_else_if_ret == undefined) {
+          if_else_if_ret = this.execExp(children![children!.length - 1], row);
+          if_else_if_targetName += ' ' + if_else_if_ret.targetName;
+        }
+        if_else_if_ret.targetName = if_else_if_targetName;
+        return if_else_if_ret;
+      case 'call':
+        let fun_name = exp.value as string;
+        let call_targetName = fun_name + '(';
+        if (this.udf[fun_name] == undefined) {
+          throw `未定义函数:${fun_name}`;
+        }
+        let args = [];
+        let first_arg = true;
+        for (let c of children!) {
+          let a = this.execExp(c, row);
+          args.push(a.value);
+          if (!first_arg) {
+            call_targetName += ',' + a.targetName;
+          } else {
+            call_targetName += a.targetName;
+          }
+          first_arg = false;
+        }
+        call_targetName += ')';
+        let call_ret = this.udf[fun_name](args);
+        call_ret.targetName = call_targetName;
+        return call_ret;
       default:
         throw `Undefined opcode: ${op}`;
     }
@@ -204,6 +260,16 @@ export class DataSet<T extends { [key: string]: any }> {
       }
       ret.push(tmpRow);
     }
-    return new DataSet(ret, '@result');
+    return new DataSet(ret, this.name);
+  }
+  public where(exp: ExpNode) {
+    let ret = [] as any[];
+    for (let row of this.data) {
+      let condition = this.execExp(exp, row);
+      if (condition.value) {
+        ret.push(row);
+      }
+    }
+    return new DataSet(ret, this.name);
   }
 }

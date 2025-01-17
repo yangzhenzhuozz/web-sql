@@ -11,9 +11,9 @@ export class SQLSession {
   } {
     return this._tableView;
   }
-  public registTableView(dataset: DataSet<any>, name: string) {
-    let tableName = name;
-    assert(tableName != undefined);
+  public registTableView(dataset: DataSet<any>) {
+    let tableName = dataset.name;
+    assert(tableName != undefined,'必须注册一个有名字的表');
     if (this._tableView[tableName] != undefined) {
       throw `表:${name}已经存在`;
     } else {

@@ -53,8 +53,9 @@ let rules: LexerRule<YYTOKEN>[] = [
     },
   },
   {
-    reg: '"([^"]|(\\\\"))*"',
+    reg: `'([^']|(\\\\'))*'`,
     handler: function (text) {
+      text = text.replaceAll('\\n', '\n').replaceAll('\\\\', '\\').replaceAll('\\t', '\t').replaceAll('\\r', '\r').replaceAll("\\'", "'").replaceAll('\\"', '"');
       return { yytext: text, type: 'string', value: text.slice(1, -1) };
     },
   },

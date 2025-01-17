@@ -5,7 +5,7 @@ export default [
       { start: 10, end: 10, target: 1 },
       { start: 13, end: 13, target: 1 },
       { start: 32, end: 32, target: 1 },
-      { start: 34, end: 34, target: 2 },
+      { start: 39, end: 39, target: 2 },
       { start: 40, end: 40, target: 3 },
       { start: 41, end: 41, target: 4 },
       { start: 42, end: 42, target: 5 },
@@ -56,9 +56,9 @@ export default [
   },
   {
     edges: [
-      { start: 0, end: 33, target: 30 },
-      { start: 34, end: 34, target: 31 },
-      { start: 35, end: 91, target: 30 },
+      { start: 0, end: 38, target: 30 },
+      { start: 39, end: 39, target: 31 },
+      { start: 40, end: 91, target: 30 },
       { start: 92, end: 92, target: 32 },
       { start: 93, end: 65535, target: 30 },
     ],
@@ -378,9 +378,9 @@ export default [
   },
   {
     edges: [
-      { start: 0, end: 33, target: 30 },
-      { start: 34, end: 34, target: 31 },
-      { start: 35, end: 91, target: 30 },
+      { start: 0, end: 38, target: 30 },
+      { start: 39, end: 39, target: 31 },
+      { start: 40, end: 91, target: 30 },
       { start: 92, end: 92, target: 32 },
       { start: 93, end: 65535, target: 30 },
     ],
@@ -390,15 +390,16 @@ export default [
     edges: [],
     handlers: [
       function (text: string) {
+        text = text.replaceAll('\\n', '\n').replaceAll('\\\\', '\\').replaceAll('\\t', '\t').replaceAll('\\r', '\r').replaceAll("\\'", "'").replaceAll('\\"', '"');
         return { yytext: text, type: 'string', value: text.slice(1, -1) };
       },
     ],
   },
   {
     edges: [
-      { start: 0, end: 33, target: 30 },
-      { start: 34, end: 34, target: 53 },
-      { start: 35, end: 91, target: 30 },
+      { start: 0, end: 38, target: 30 },
+      { start: 39, end: 39, target: 53 },
+      { start: 40, end: 91, target: 30 },
       { start: 92, end: 92, target: 32 },
       { start: 93, end: 65535, target: 30 },
     ],
@@ -664,14 +665,15 @@ export default [
   },
   {
     edges: [
-      { start: 0, end: 33, target: 30 },
-      { start: 34, end: 34, target: 31 },
-      { start: 35, end: 91, target: 30 },
+      { start: 0, end: 38, target: 30 },
+      { start: 39, end: 39, target: 31 },
+      { start: 40, end: 91, target: 30 },
       { start: 92, end: 92, target: 32 },
       { start: 93, end: 65535, target: 30 },
     ],
     handlers: [
       function (text: string) {
+        text = text.replaceAll('\\n', '\n').replaceAll('\\\\', '\\').replaceAll('\\t', '\t').replaceAll('\\r', '\r').replaceAll("\\'", "'").replaceAll('\\"', '"');
         return { yytext: text, type: 'string', value: text.slice(1, -1) };
       },
     ],
