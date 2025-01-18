@@ -5,7 +5,7 @@ export interface FieldType {
   name: string;
   type: 'string' | 'number' | 'bigint' | 'boolean' | 'symbol' | 'undefined' | 'object' | 'function';
 }
-let udf: {
+type UDF = {
   [key: string]:
     | {
         type: 'normal';
@@ -15,7 +15,8 @@ let udf: {
         type: 'aggregate';
         handler: (list: (valueType | undefined)[]) => valueType | undefined;
       };
-} = {
+};
+let udf: UDF = {
   concat: {
     type: 'normal',
     handler: (...args) => {
@@ -37,22 +38,67 @@ let udf: {
   },
 };
 export class DataSet<T extends { [key: string]: any }> {
-  private schemaIdx: { [key: string]: string } = {};
   public data: T[] = [];
   public name?: string;
 
+  /**
+   * 通过表名.字段形式索引时，得到在数据集中的真实id，假设当前表名是t1，数据集里面的真实记录是[{id:1,name:john}],
+   * 则通过 t1.name真实访问的是name
+   */
+  private tableNameToField: {
+    [key: string]: {
+      [key: string]: string;
+    };
+  } = {};
+
+  //用于创建t1.c1 => c1 t2.id=>t2.id 的映射(id在两个表中都有,c1只在t1中有,所以映射结果不同)
+  private createTableNameToField(arr: any[], t: string, duplicateKey?: Set<string>) {
+    let tableNameToField: {
+      [key: string]: {
+        [key: string]: string;
+      };
+    } = { [t]: {} };
+    for (let k in arr[0]) {
+      if (duplicateKey == undefined || !duplicateKey.has(k)) {
+        tableNameToField[t][k] = k;
+      } else {
+        tableNameToField[t][k] = `${this.name}.${k}`;
+      }
+    }
+    return tableNameToField;
+  }
   public constructor(arr: T[], name?: string) {
     this.name = name;
-    for (let k in arr[0]) {
-      let fieldName = `${name ?? ''}.${k}`;
-      this.schemaIdx[fieldName] = k;
-    }
     this.data = arr;
+    if (name != undefined) {
+      this.tableNameToField = this.createTableNameToField(arr, name);
+    }
   }
-  public alias(name: string): DataSet<T> {
-    return new DataSet(this.data, name);
+  //笛卡尔积
+  private cross(f1: any[], f2: any, t1: string, t2: string, duplicateKey: Set<string>) {
+    let ret = [];
+    for (let r1 of f1) {
+      for (let r2 of f2) {
+        let tmpRow = {} as any;
+        for (let k in r1) {
+          if (duplicateKey.has(k)) {
+            tmpRow[`${t1}.${k}`] = r1[k];
+          } else {
+            tmpRow[k] = r1[k];
+          }
+        }
+        for (let k in r2) {
+          if (duplicateKey.has(k)) {
+            tmpRow[`${t2}.${k}`] = r2[k];
+          } else {
+            tmpRow[k] = r2[k];
+          }
+        }
+        ret.push(tmpRow);
+      }
+    }
+    return ret;
   }
-
   //深度遍历执行
   private execExp(exp: ExpNode, row: T): ExpNode {
     /**
@@ -65,7 +111,7 @@ export class DataSet<T extends { [key: string]: any }> {
      * group by
      *  left(name,4)
      */
-    if (row[exp.targetName] != undefined) {
+    if (row[exp.targetName] != undefined && exp.op != 'immediate_val') {
       return {
         op: 'immediate_val',
         targetName: exp.targetName,
@@ -85,17 +131,16 @@ export class DataSet<T extends { [key: string]: any }> {
         result = this.execExp(children![0], row).value;
         break;
       case 'getTableField':
-        let fieldName = exp.value as string;
-        let idx = this.schemaIdx[fieldName];
-        if (idx == undefined) {
-          throw `Invalid field name: ${fieldName},if you select a field before group,the field must in group keys`;
+        let [tableName, fieldName] = (<string>exp.value).split('.');
+        if (row[this.tableNameToField[tableName][fieldName]] == undefined) {
+          throw `Invalid field name: ${tableName}.${fieldName},if you select a field before group,the field must in group keys`;
         }
-        result = row[idx];
+        result = row[this.tableNameToField[tableName][fieldName]];
         break;
       case 'getfield':
         let fieldName2 = exp.value as string;
         if (row[fieldName2] == undefined) {
-          throw `Table: ${this.name} does not have field: ${fieldName2},if you select a field before group,the field must in group keys`;
+          throw `Table: ${this.name} does not have field: ${fieldName2}`;
         }
         result = row[fieldName2];
         break;
@@ -239,6 +284,85 @@ export class DataSet<T extends { [key: string]: any }> {
       targetName: exp.targetName,
     };
   }
+  //排序连接
+  private sortMergeJoin(
+    other: DataSet<any>,
+    option: {
+      k1: string;
+      k2: string;
+      t1: string;
+      t2: string;
+      duplicateKey: Set<string>;
+    }
+  ): any[] {
+    let compare = (ka: string, kb: string) => {
+      return (a: any, b: any) => {
+        if (a[ka] < b[kb]) {
+          return -1;
+        } else if (a[ka] > b[kb]) {
+          return 1;
+        } else {
+          return 0;
+        }
+      };
+    };
+    //搜索窗口区间
+    let windowFrame = (arr: any[], start: number, k: string) => {
+      if (start >= arr.length) {
+        return 0;
+      }
+      let v = arr[start][k];
+      let idx = start + 1;
+      for (; idx < arr.length && arr[idx][k] == v; idx++) {}
+      return idx - start;
+    };
+
+    let arr1 = Array.from(this.data);
+    let arr2 = Array.from(other.data);
+
+    arr1.sort(compare(option.k1, option.k1)); //a集合排序
+    arr2.sort(compare(option.k2, option.k2)); //b集合排序
+
+    //开始进行连接
+    let idx1 = 0;
+    let idx2 = 0;
+
+    let ret = [] as any[];
+    //arr2没有和arr1配得上的时候使用
+    let empty2 = {} as any;
+    for (let obj_k in arr2[0]) {
+      empty2[obj_k] = null;
+    }
+    for (; idx1 < arr1.length; ) {
+      let cmp: number;
+
+      //arr2已经走完了
+      if (idx2 < arr2.length) {
+        cmp = compare(option.k1, option.k2)(arr1[idx1], arr2[idx2]);
+      } else {
+        cmp = 1;
+      }
+
+      let w1 = windowFrame(arr1, idx1, option.k1);
+      let w2 = windowFrame(arr2, idx2, option.k2);
+      let f1 = arr1.slice(idx1, idx1 + w1);
+      if (cmp < 0 || w2 == 0) {
+        ret.push(...this.cross(f1, [empty2], option.t1, option.t2, option.duplicateKey));
+        idx1 += w1;
+      } else if (cmp > 0) {
+        idx2 += w2;
+      } else {
+        let f2 = arr2.slice(idx2, idx2 + w2);
+        ret.push(...this.cross(f1, f2, option.t1, option.t2, option.duplicateKey));
+        idx1 += w1;
+        idx2 += w2;
+      }
+    }
+    return ret;
+  }
+  public alias(name: string): DataSet<T> {
+    return new DataSet(this.data, name);
+  }
   public select(exps: ExpNode[]): DataSet<any> {
     let ret = [] as any[];
     for (let row of this.data) {
@@ -359,12 +483,82 @@ export class DataSet<T extends { [key: string]: any }> {
     }
     return new DataSet(ds, this.name);
   }
-  public leftJoin(rt: DataSet<any>, exp: ExpNode): DataSet<any> {
-    if(exp.op=='eq'){//确认下面只有一层,而且是getField或者是getTableField
+  public leftJoin(other: DataSet<any>, exp: ExpNode): DataSet<any> {
+    let retArr = [] as any[];
 
-    }else{
-      console.warn(`非等值连接得上笛卡尔积，你可以考虑换成等值连接`);
+    assert(this.name != undefined);
+    assert(other.name != undefined);
+
+    //构造key
+    let tableKey: {
+      [key: string]: {
+        table: string;
+        id: string;
+      };
+    } = {}; //把a.c1映射到a.c1
+
+    let keyTable: {
+      [key: string]: {
+        table: string;
+        id: string;
+      };
+    } = {}; //把c1映射到a.c1
+    //上面两个映射用于快速判断这个join是否可以进行优化
+
+    let duplicateKey = new Set<string>(); //两个表重复的id
+
+    for (let k in this.data[0]) {
+      tableKey[`${this.name}.${k}`] = {
+        table: this.name,
+        id: k,
+      };
+      keyTable[k] = {
+        table: this.name!,
+        id: k,
+      };
     }
-    throw 'unimpliment';
+    for (let k in other.data[0]) {
+      tableKey[`${other.name}.${k}`] = {
+        table: other.name,
+        id: k,
+      };
+      if (keyTable[k] == undefined) {
+        keyTable[k] = {
+          table: other.name!,
+          id: k,
+        };
+      } else {
+        duplicateKey.add(k);
+        delete keyTable[k]; //两个表都有同样的字段，直接删除，不能再直接使用id取字段
+      }
+    }
+
+    if (exp.op == 'eq') {
+      let [exp1, exp2] = exp.children!;
+      let f1 = exp1.op == 'getfield' ? keyTable[exp1.value as string] : tableKey[exp1.value as string];
+      let f2 = exp2.op == 'getfield' ? keyTable[exp2.value as string] : tableKey[exp2.value as string];
+
+      if (f1 != undefined && f2 != undefined && f1.table != f2.table) {
+        //开始连接
+        retArr = this.sortMergeJoin(other, {
+          t1: this.name,
+          t2: other.name,
+          k1: f1.id,
+          k2: f2.id,
+          duplicateKey,
+        });
+        let ret = new DataSet(retArr);
+        ret.tableNameToField = { ...this.createTableNameToField(this.data, this.name, duplicateKey), ...this.createTableNameToField(other.data, other.name, duplicateKey) };
+        return ret;
+      }
+    }
+    //只有左右表各直接选择一个字段进行等值连接才能优化
+    console.warn(`只有从两个表各取一个字段等值连接有优化,其他情况使用笛卡尔积连接，请考虑优化`);
+    retArr = this.cross(this.data, other.data, this.name, other.name, duplicateKey);
+    let crossResult = new DataSet(retArr);
+    let result = crossResult.where(exp);
+    result.name = `@crossResult`;
+    result.tableNameToField = { ...this.createTableNameToField(this.data, this.name, duplicateKey), ...this.createTableNameToField(other.data, other.name, duplicateKey) };
+    return result;
   }
 }

@@ -1,9 +1,9 @@
 import { DataSet } from './tools/DataSet.js';
 import { SQLSession } from './tools/SQLSession.js';
-
-let code1 = `
+let testCase: { [key: string]: string } = {
+  code1: `
 select
-    concat(),
+    concat('a','a\\'b'),
     concat(1),
     concat(1,2),
     id,
@@ -15,9 +15,8 @@ select
     name as c2
 from
     t1 as t1
-`;
-
-let code2 = `
+`,
+  code2: `
 select
     t1.id,
     1=1,
@@ -27,8 +26,8 @@ select
 from
     t1
 where id=1 or name='danny'
-`;
-let code3 = `
+`,
+  code3: `
 select * from (
 select
     t1.id,
@@ -40,48 +39,46 @@ from
     t1
 ) as aaa
  where aaa.id=1
-`;
-
-let code4 = `
+`,
+  code4: `
 select
 concat(id,gender)
 from
     t1
 group by id,gender,concat('id_',id,'_haha'),concat('id_',id,'_gender')
-`;
-
-let code5 = `
+`,
+  code5: `
 select
 gender,id%2,count(),sum(score)
 from
     t1
 group by gender,id%2
-`;
-let code6 = `
+`,
+  code6: `
 select
 gender,id%2,count(),sum(score)
 from
     t1
 group by gender,id%2
 having gender='男' and sum(score)=30
-`;
-let code7 = `
+`,
+  code7: `
 select
   *
 from
   t1
 order by
   score desc
-`;
-let code8 = `
+`,
+  code8: `
 select
   *
 from
   t1
 order by
   score,concat(id) desc
-`;
-let code9 = `
+`,
+  code9: `
 select
   *
 from
@@ -89,22 +86,61 @@ from
 order by
   id
 limit 1,2
-`;
+`,
+  code10: `
+select
+  *
+from
+  t1 left join t2 on t1.id=t2.id
+`,
+  code11: `
+select
+  *
+from
+  t1 left join t2 on t1.id=1
+`,
+  code12: `
+select
+  *
+from
+  t1 left join t2 on t1.id=idx
+`,
+  code13: `
+select
+  *
+from
+  t1 left join t2 on 1=1
+`,
+  code14: `
+select
+  t1.gender
+from
+  t1 left join t2 on 1=1
+`,
+};
+
 let arr = [
   { id: 1, gender: '男', name: 'john', score: 10 },
-  { id: 2, gender: '女', name: 'kelly', score: 10 },
-  { id: 3, gender: '男', name: 'danny', score: 10 },
-  { id: 4, gender: '男', name: 'white', score: 10 },
-  { id: 5, gender: '男', name: 'arm strong', score: 10 },
-  { id: 6, gender: '女', name: 'sanndy', score: 20 },
+  { id: 2, gender: '女', name: 'kelly', score: 11 },
+];
+let arr2 = [
+  { id: 2, idx: 2, score2: 15 },
+  { id: 3, idx: 3, score2: 17 },
 ];
 
+//创建两个数据集
 let ds = new DataSet(arr, 't1');
+let ds2 = new DataSet(arr2, 't2');
 
+//把集合注册到Session中
 let session = new SQLSession();
 session.registTableView(ds);
+session.registTableView(ds2);
 
-console.time('Execution Time');
-let ret = session.sql(code9);
-console.table(ret.data);
-console.timeEnd('Execution Time');
+for (let k in testCase) {
+  console.log(`开始执行:${k}`);
+  console.time('Execution Time');
+  let ret = session.sql(testCase[k]);
+  console.table(ret.data);
+  console.timeEnd('Execution Time');
+}

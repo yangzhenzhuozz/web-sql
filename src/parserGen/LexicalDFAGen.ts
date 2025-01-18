@@ -7,6 +7,9 @@ let rules: LexerRule<YYTOKEN>[] = [
   {reg: 'from',handler: function (text) {return {yytext: 'from',type: text,value: text,};},}, // prettier-ignore
   {reg: 'select',handler: function (text) {return {yytext: 'select',type: text,value: text,};},}, // prettier-ignore
   {reg: 'where',handler: function (text) {return {yytext: 'where',type: text,value: text,};},}, // prettier-ignore
+  {reg: 'left',handler: function (text) {return {yytext: 'left',type: text,value: text,};},}, // prettier-ignore
+  {reg: 'join',handler: function (text) {return {yytext: 'join',type: text,value: text,};},}, // prettier-ignore
+  {reg: 'on',handler: function (text) {return {yytext: 'on',type: text,value: text,};},}, // prettier-ignore
   {reg: ',',handler: function (text) {return {yytext: ',',type: text,value: text,};},}, // prettier-ignore
   {reg: 'as',handler: function (text) {return {yytext: 'as',type: text,value: text,};},}, // prettier-ignore
 
