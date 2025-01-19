@@ -32,7 +32,11 @@ export class DataSet<T extends { [key: string]: any }> {
       [key: string]: string;
     };
   } = {};
-  private fiels: Set<string> = new Set();
+
+  private fiels: Set<string> = new Set(); //属性列表
+  private groupfiels: Set<string> = new Set(); //聚合之后的属性列表
+  private useGroudFields = false;
+
   public constructor(arr: T[], name?: string, session?: SQLSession) {
     this.name = name;
     this.data = arr;
@@ -126,7 +130,8 @@ export class DataSet<T extends { [key: string]: any }> {
         break;
       case 'getfield':
         let fieldName2 = exp.value as string;
-        if (!this.fiels.has(fieldName2)) {
+        //如果是搜索聚合属性，则切换搜索位置
+        if ((!this.useGroudFields && !this.fiels.has(fieldName2)) || (this.useGroudFields && !this.groupfiels.has(fieldName2))) {
           throw `Table: ${this.name} does not have field: ${fieldName2}`;
         }
         result = row[fieldName2];
@@ -246,6 +251,7 @@ export class DataSet<T extends { [key: string]: any }> {
           } else if (children!.length > 1) {
             throw `聚合函数目前只支持0个或者1个参数`;
           } else {
+            this.useGroudFields = true;
             let list = [] as valueType[];
             if (children!.length == 1) {
               for (let subLine of row['@totalGroupValues']) {
@@ -256,6 +262,7 @@ export class DataSet<T extends { [key: string]: any }> {
             } else {
               result = this.session!.udf[fun_name].handler(row['@totalGroupValues']);
             }
+            this.useGroudFields = false; //还原
           }
         } else {
           let args: (valueType | undefined)[] = [];
@@ -399,7 +406,7 @@ export class DataSet<T extends { [key: string]: any }> {
         tmpRow[cell.targetName!] = cell.value!;
         groupValues.push(cell.value!);
       }
-      tmpRow['@totalGroupValues'] = groupValues.map((item) => item.toString()).reduce((p, c) => p + ',' + c);
+      tmpRow['@totalGroupValues'] = groupValues.map((item) => item?.toString()).reduce((p, c) => p + ',' + c);
       ds.push(tmpRow);
     }
     let groupBy = (array: any[], key: string) => {
@@ -422,6 +429,7 @@ export class DataSet<T extends { [key: string]: any }> {
 
     let ret = new DataSet(groupDs, this.name, this.session);
     ret.tableNameToField = this.tableNameToField;
+    ret.groupfiels = new Set([...Object.keys(ret.data[0]['@totalGroupValues'][0])]);
     return ret;
   }
   public orderBy(exps: ExpNode[]) {

@@ -3,20 +3,19 @@ import { assert } from '../tools/assert.js';
 
 let sql = `
 select
-  t1.id,max(B.score2)
+  t1.id,max(score)
 from
   t1 left join t2 as B on t1.id=B.id
 group by t1.id
 `;
 let arr = [
-  { id: 1, gender: '男', name: 'john', score: 10 },
-  { id: 2, gender: '女', name: 'kelly', score: 11 },
-  { id: 12, gender: '女', name: 'danny', score: 15 },
+  { id: 1, name: '张三' },
+  { id: 2, name: '李四' },
 ];
 let arr2 = [
-  { id: 2, idx: 2, score2: 15 },
-  { id: 2, idx: 2, score2: 99 },
-  { id: 3, idx: 3, score2: 17 },
+  { id: 2, score: 5 },
+  { id: 2, score: 8 },
+  { id: 3, score: 10 },
 ];
 
 //创建两个数据集
@@ -28,7 +27,14 @@ let session = new SQLSession();
 session.reisgerUDF('max', {
   type: 'aggregate',
   handler: function (list: number[]) {
-    return Math.max(...list);
+    let ret = list[0];
+    for (let v of list) {
+      if (v == undefined) {
+        return null;
+      }
+      ret = Math.max(ret, v);
+    }
+    return ret;
   },
 });
 session.registTableView(ds);
