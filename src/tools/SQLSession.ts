@@ -43,11 +43,11 @@ export class SQLSession {
     obj:
       | {
           type: 'normal';
-          handler: (...args: (valueType | undefined)[]) => valueType | undefined;
+          handler: (...args: any[]) => valueType | undefined;
         }
       | {
           type: 'aggregate';
-          handler: (list: (valueType | undefined)[]) => valueType | undefined;
+          handler: (list: any[]) => valueType | undefined;
         }
   ) {
     this.udf[name] = obj;

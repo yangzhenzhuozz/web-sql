@@ -28,9 +28,9 @@ let ds2 = new DataSet(arr2, 't2');
 let session = new SQLSession();
 session.reisgerUDF('max', {
   type: 'aggregate',
-  handler: function (list) {
+  handler: function (list: number[]) {
     assert(typeof list[0] == 'number', 'max只能用于数字');
-    return Math.max(...(<number[]>list));
+    return Math.max(...list);
   },
 });
 session.registTableView(ds);
