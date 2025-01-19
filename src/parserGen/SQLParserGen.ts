@@ -7,8 +7,9 @@ declare let Context: SQLSession;
 function gen() {
   let grammar: Grammar = {
     userCode: `//这个文件用SQLParserGen.ts生成的`,
-    tokens: ['.', 'left', 'join', 'from', 'on', 'id', 'select', 'where', ',', 'as', '<', '<=', '>', '>=', '=', '+', '-', '*', '/', '%', '(', ')', 'if', 'then', 'else', 'elseif', 'end', 'and', 'or', 'order', 'group', 'by', 'asc', 'desc', 'having', 'limit', 'number', 'string'],
+    tokens: ['.', 'left', 'join', 'from', 'on', 'id', 'select', 'where', ',', 'as', '<', '<=', '>', '>=', '=', '+', '-', '*', '/', '%', '(', ')', 'if', 'then', 'else', 'elseif', 'end', 'and', 'or', 'not', 'order', 'group', 'by', 'asc', 'desc', 'having', 'limit', 'number', 'string'],
     association: [
+      { left: ['not'] },
       { left: ['or'] },
       { left: ['and'] },
       { nonassoc: ['<', '<=', '=', '>', '>='] },
@@ -580,6 +581,18 @@ function gen() {
               op: 'or',
               children: [e1, e2],
               targetName: `${e1.targetName} or ${e2.targetName}`,
+            };
+          },
+        },
+      },
+      {
+        'exp:not exp': {
+          action: function ($): ExpNode {
+            let exp = $[1] as ExpNode;
+            return {
+              op: 'not',
+              children: [exp],
+              targetName: `not ${exp.targetName}`,
             };
           },
         },

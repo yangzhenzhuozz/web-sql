@@ -224,6 +224,10 @@ export class DataSet<T extends { [key: string]: any }> {
         r_Child = this.execExp(children![1], row);
         result = l_Child.value! || r_Child.value!;
         break;
+      case 'not':
+        l_Child = this.execExp(children![0], row);
+        result = !l_Child.value!;
+        break;
       case 'if-else':
         let if_else_condition = this.execExp(children![0], row);
         if (if_else_condition.value!) {
