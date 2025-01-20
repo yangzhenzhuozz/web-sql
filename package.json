@@ -15,7 +15,7 @@
     "LexicalDFAGen": "npm run buildLexicalDFAGen && node ./dist/parserGen/LexicalDFAGen.js",
     "build": "npm run LexicalDFAGen && tsc -p tsconfig.json",
     "pack": "npm run build && npm pack"
-  },
+},
   "files": [
     "dist/tools",
     "dist/main.d.ts",
