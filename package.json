@@ -9,9 +9,13 @@
   "module": "dist/main.js",
   "types": "dist/main.d.ts",
   "scripts": {
-    "build": "tsc -p tsconfig.json",
+    "buildLexcical": "tsc .src/parserGen/LexicalDFAGen.ts   --noCheck  --outDir .dist/parserGen   --target ESNext",
+    "buildSQLParser": "tsc .src/parserGen/SQLParserGen.ts   --noCheck  --outDir .dist  --target ESNext",
+    "genLexcial": "npm run buildLexcical && node .dist/parserGen/LexicalDFAGen.js",
+    "genSQLParser": "npm run buildLexcical && node .dist/parserGen/SQLParserGen.js",
+    "build": "npm run genLexcial && npm run genSQLParser && tsc -p tsconfig.json",
     "pack": "npm run build && npm pack"
-  },
+},
   "files": [
     "dist/tools",
     "dist/main.d.ts",
