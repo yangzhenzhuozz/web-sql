@@ -716,7 +716,7 @@ function gen() {
       },
     ],
   };
-  console.log(`一共有${grammar.BNF.length}个BNF`);
+  // console.log(`一共有${grammar.BNF.length}个BNF`);//担心有的bnf没有设置action,这里检查一下bnf的数量和action数量是否匹配
   let tscc = new TSCC(grammar, { debug: false, language: 'zh-cn' });
   let compilerSorce = tscc.generate({ genDts: true });
   if (compilerSorce == undefined) {
@@ -724,7 +724,7 @@ function gen() {
   } else {
     fs.writeFileSync('./src/tools/SQLParser.ts', compilerSorce.code);
     fs.writeFileSync('./src/tools/SQLParserDeclare.d.ts', compilerSorce.dts);
-    console.log('parse geneate end');
+    console.log('SQL解析器生成成功');
   }
 }
 gen();

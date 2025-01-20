@@ -87,4 +87,4 @@ for (let k in functionStrCache) {
 }
 
 fs.writeFileSync('src/tools/lexicalRules.ts', `export default ${serializedDfa};`);
-console.log('lexcial geneate end');
+console.log('词法分析器生成成功');
