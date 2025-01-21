@@ -23,8 +23,18 @@ export class SQLSession {
     sum: {
       type: 'aggregate',
       handler: (list) => {
-        assert(typeof list[0] == 'number', 'sum只能累加数字');
-        return list.reduce((p, c) => <number>p + <number>c);
+        assert(typeof list[0][0] == 'number', 'sum只能累加数字');
+        return list.map((item) => item[0]).reduce((p, c) => <number>p + <number>c); //只取第一列的值累加
+      },
+    },
+    row_number: {
+      type: 'windowFrame',
+      handler: (list) => {
+        let ret = [] as number[];
+        for (let i = 1; i < list.length + 1; i++) {
+          ret.push(i);
+        }
+        return ret; //只取第一列的值累加
       },
     },
   };

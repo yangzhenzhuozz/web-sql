@@ -1,5 +1,5 @@
-import { assert } from './assert.js';
-import { ExpNode, valueType } from './ExpTree.js';
+import { assert, isWindowFrame } from './assert.js';
+import { ExpNode, valueType, valueTypeList, WindowFrame } from './ExpTree.js';
 import { SQLSession } from './SQLSession.js';
 
 export interface FieldType {
@@ -14,7 +14,11 @@ export type UDF = {
       }
     | {
         type: 'aggregate';
-        handler: (list: (valueType | undefined)[]) => valueType | undefined;
+        handler: (list: (valueType | undefined)[][]) => valueType | undefined;
+      }
+    | {
+        type: 'windowFrame';
+        handler: (list: (valueType | undefined)[][]) => valueTypeList|undefined;
       };
 };
 
@@ -107,7 +111,7 @@ export class DataSet<T extends { [key: string]: any }> {
     }
 
     let { op, children } = exp;
-    let result: valueType | undefined = undefined;
+    let result: valueType | valueTypeList | undefined = undefined;
     let l_Child: ExpNode;
     let r_Child: ExpNode;
     switch (op) {
@@ -246,28 +250,43 @@ export class DataSet<T extends { [key: string]: any }> {
           throw `未定义函数:${fun_name}`;
         }
         if (this.session!.udf[fun_name].type == 'aggregate') {
-          if (row['@totalGroupValues'] === undefined) {
-            throw `还没有group by的表不能使用聚合函数${fun_name}`;
-          } else if (children!.length > 1) {
-            throw `聚合函数目前只支持0个或者1个参数`;
+          if (row['@totalGroupValues'] === undefined && row['@frameGroupValues'] == undefined) {
+            throw `还没有group by或者开窗不能使用聚合函数${fun_name}`;
           } else {
-            let list = [] as valueType[];
-            if (children!.length == 1) {
-              for (let subLine of row['@totalGroupValues']) {
-                let arg = this.execExp(children![0], subLine).value!;
-                list.push(arg);
+            let aggregateKey = row['@totalGroupValues'] !== undefined ? '@totalGroupValues' : '@frameGroupValues';
+            let list = [] as valueType[][];
+            for (let subLine of row[aggregateKey]) {
+              let args = [];
+              for (let child of children!) {
+                let arg = this.execExp(child, subLine).value! as valueType;
+                args.push(arg);
               }
-              result = this.session!.udf[fun_name].handler(list);
-            } else {
-              result = this.session!.udf[fun_name].handler(row['@totalGroupValues']);
+              list.push(args);
             }
+            result = this.session!.udf[fun_name].handler(list);
           }
-        } else {
+        } else if (this.session!.udf[fun_name].type == 'normal') {
           let args: (valueType | undefined)[] = [];
           for (let c of children!) {
-            args.push(this.execExp(c, row).value);
+            args.push(this.execExp(c, row).value as valueType | undefined);
           }
           result = this.session!.udf[fun_name].handler(...args);
+        } else {
+          if (row['@frameGroupValues'] == undefined) {
+            throw `还没有group by或者开窗不能使用聚合函数${fun_name}`;
+          } else {
+            let aggregateKey = '@frameGroupValues';
+            let list = [] as valueType[][];
+            for (let subLine of row[aggregateKey]) {
+              let args = [];
+              for (let child of children!) {
+                let arg = this.execExp(child, subLine).value! as valueType;
+                args.push(arg);
+              }
+              list.push(args);
+            }
+            result = this.session!.udf[fun_name].handler(list);
+          }
         }
         break;
       default:
@@ -358,22 +377,147 @@ export class DataSet<T extends { [key: string]: any }> {
   public alias(name: string): DataSet<T> {
     return new DataSet(this.data, name, this.session);
   }
-  public select(exps: ExpNode[]): DataSet<any> {
+
+  public select(exps: (ExpNode | WindowFrame)[]): DataSet<any> {
     let arr = [] as any[];
-    for (let row of this.data) {
+    //不同的窗口函数
+    let windowFunctions = [] as {
+      keys: string[];
+      windowFunction: ExpNode;
+      alias?: string;
+      targetName: string;
+      order?: ExpNode[];
+    }[];
+    for (let row_idx = 0; row_idx < this.data.length; row_idx++) {
+      let row = this.data[row_idx];
       let tmpRow = {} as any;
+      let partition_idx = 0;
       for (let i = 0; i < exps.length; i++) {
-        let cell = this.execExp(exps[i], row);
-        if (tmpRow[cell.targetName!] !== undefined) {
-          throw `select重复属性:${cell.targetName!}`;
+        let exp = exps[i];
+        if (isWindowFrame(exp)) {
+          //把exp中的所有node全部select出来
+          let partitionKeyOfNowFun = [] as string[]; //只在第一行处理key，后面行都是重复数据，就不用处理了
+          for (let node of exp.partition) {
+            let cell = this.execExp(node, row);
+            let pk = `@framePartion_${partition_idx}_${cell.targetName!}`;
+            tmpRow[pk] = cell.value!;
+            partition_idx++;
+            if (row_idx == 0) {
+              partitionKeyOfNowFun.push(pk);
+            }
+          }
+          if (row_idx == 0) {
+            windowFunctions.push({
+              keys: partitionKeyOfNowFun,
+              windowFunction: exp.windowFunction,
+              alias: exp.alias,
+              targetName: exp.targetName,
+              order: exp.order,
+            });
+          }
+          // throw `unimpliment window frame`;
+        } else {
+          let cell = this.execExp(exp, row);
+          if (tmpRow[cell.targetName!] !== undefined) {
+            throw `select重复属性:${cell.targetName!}`;
+          }
+          tmpRow[cell.targetName!] = cell.value!;
         }
-        tmpRow[cell.targetName!] = cell.value!;
       }
       arr.push(tmpRow);
     }
+
     let ds = new DataSet(arr, undefined, this.session);
-    ds.tableNameToField = this.tableNameToField; //limit不更新tableNameToField
+    ds.tableNameToField = this.tableNameToField; //select不更新tableNameToField
     ds.name = this.name;
+    if (windowFunctions.length > 0) {
+      console.log('开始处理窗口');
+      for (let winFun_idx = 0; winFun_idx < windowFunctions.length; winFun_idx++) {
+        let winfun = windowFunctions[winFun_idx];
+        let orderKeys = [] as ExpNode[];
+        for (let k_idx = 0; k_idx < winfun.keys.length; k_idx++) {
+          let k = winfun.keys[k_idx];
+          orderKeys.push({
+            op: 'order',
+            children: [
+              {
+                op: 'getfield',
+                value: k,
+                targetName: k,
+              },
+            ],
+            targetName: `@frame_${winFun_idx}_order_${k_idx}`,
+            order: 'asc',
+          });
+        }
+
+        ds = ds.orderBy(orderKeys); //先按照窗口key排序，取得各个窗口数据
+        let retArr = [];
+        for (let start = 0; ; ) {
+          let startRow = ds.data[start];
+          let end = start + 1;
+          for (; end < ds.data.length; end++) {
+            let isSame = true;
+            for (let pk of winfun.keys) {
+              if (startRow[pk] !== ds.data[end][pk]) {
+                isSame = false;
+                break;
+              }
+            }
+            if (!isSame) {
+              break;
+            }
+          }
+          if (start >= ds.data.length) {
+            break;
+          }
+
+          //创建一个只有一行的ds
+          let frameDS = new DataSet(ds.data.slice(start, end), undefined, this.session);
+
+          //开窗排序
+          if (winfun.order) {
+            frameDS = frameDS.orderBy(winfun.order);
+          }
+
+          let retRow = ds.execExp(winfun.windowFunction, { '@frameGroupValues': frameDS.data });
+          if (this.session!.udf[winfun.windowFunction.value! as string].type == 'aggregate') {
+            for (let frameRow of frameDS.data) {
+              if (winfun.alias) {
+                if (frameRow[winfun.alias] !== undefined) {
+                  throw `窗口函数重命名${winfun.alias}和select的名字重复`;
+                }
+                frameRow[winfun.alias] = <valueType>retRow.value;
+              } else {
+                frameRow[winfun.targetName] = <valueType>retRow.value;
+              }
+            }
+          } else {
+            for (let idx = 0; idx < frameDS.data.length; idx++) {
+              let frameRow = frameDS.data[idx];
+              if (winfun.alias) {
+                if (frameRow[winfun.alias] !== undefined) {
+                  throw `窗口函数重命名${winfun.alias}和select的名字重复`;
+                }
+                frameRow[winfun.alias] = (<valueTypeList>retRow.value)[idx];
+              } else {
+                frameRow[winfun.targetName] = (<valueTypeList>retRow.value)[idx];
+              }
+            }
+          }
+          for (let row_idx = 0; row_idx < frameDS.data.length; row_idx++) {
+            let row = frameDS.data[row_idx];
+            for (let k_idx = 0; k_idx < winfun.keys.length; k_idx++) {
+              delete row[winfun.keys[k_idx]];
+              delete row[`@frame_${winFun_idx}_order_${k_idx}`];
+            }
+            retArr.push(row);
+          }
+          start = end;
+        }
+        ds = new DataSet(retArr, undefined, this.session);
+      }
+    }
     return ds;
   }
   public where(exp: ExpNode): DataSet<T> {
@@ -408,7 +552,7 @@ export class DataSet<T extends { [key: string]: any }> {
         }
 
         tmpRow[cell.targetName] = cell.value!;
-        groupValues.push(cell.value!);
+        groupValues.push(cell.value! as valueType);
       }
       tmpRow['@totalGroupValues'] = groupValues.map((item) => item?.toString()).reduce((p, c) => p + ',' + c);
       ds.push(tmpRow);
@@ -436,10 +580,23 @@ export class DataSet<T extends { [key: string]: any }> {
     ret.tableNameToField = tableNameToField; //这里刷新之后可能取到不在group中的字段
     return ret;
   }
-  public orderBy(exps: ExpNode[]) {
+  public orderBy(
+    exps: ExpNode[],
+    option?: {
+      start: number;
+      end: number;
+    }
+  ) {
     let arr = [] as any[];
     let orderKeys = [] as { name: string; order: 'asc' | 'desc' }[];
-    for (let i = 0; i < this.data.length; i++) {
+    let start = 0;
+    let end = this.data.length;
+    if (option != undefined) {
+      start = option.start;
+      end = option.end;
+    }
+    let orderFields = [] as string[];
+    for (let i = start; i < end; i++) {
       let row = this.data[i];
       let tmpRow = { ...row } as any;
       for (let exp of exps) {
@@ -447,7 +604,8 @@ export class DataSet<T extends { [key: string]: any }> {
         if (exp.order !== 'asc') {
         } else {
         }
-        let orderKey = exp.targetName;
+        let orderKey = '@order by ' + exp.targetName;
+        orderFields.push(orderKey);
         tmpRow[orderKey] = ret.value;
 
         //只在第一行判断group key
@@ -479,6 +637,11 @@ export class DataSet<T extends { [key: string]: any }> {
       return 0;
     };
     arr.sort(compare);
+    for (let row of arr) {
+      for (let k of orderFields) {
+        delete row[k];
+      }
+    }
     let ds = new DataSet(arr, undefined, this.session);
     ds.tableNameToField = this.tableNameToField; //orderBy不更新tableNameToField
     ds.name = this.name;

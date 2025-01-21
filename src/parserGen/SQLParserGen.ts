@@ -1,16 +1,20 @@
 import fs from 'fs';
 import { Grammar, default as TSCC } from 'tscc';
-import { ExpNode, SelectList } from '../tools/ExpTree.js';
+import { ExpNode, SelectList, WindowFrame } from '../tools/ExpTree.js';
+import { isWindowFrame } from '../tools/assert.js';
 
 declare interface DataSet<T> {
+  data: T[];
   alias(name: string): DataSet<T>;
-  select(exps: ExpNode[]): DataSet<any>;
+  select(exps: (ExpNode | WindowFrame)[]): DataSet<any>;
   where(exp: ExpNode): DataSet<T>;
   group(exps: ExpNode[]): DataSet<any>;
   orderBy(exps: ExpNode[]): DataSet<any>;
   limit(exp: ExpNode): DataSet<any>;
   leftJoin(other: DataSet<any>, exp: ExpNode): DataSet<any>;
 }
+
+//暂时只需要用到SQLSession的tableView属性
 declare interface SQLSession {
   tableView: {
     [key: string]: DataSet<any>;
@@ -20,8 +24,8 @@ declare interface SQLSession {
 declare let Context: SQLSession;
 function gen() {
   let grammar: Grammar = {
-    userCode: `//这个文件用SQLParserGen.ts生成的`,
-    tokens: ['.', 'left', 'join', 'from', 'on', 'id', 'select', 'where', ',', 'as', '<', '<=', '>', '>=', '=', '+', '-', '*', '/', '%', '(', ')', 'if', 'then', 'else', 'elseif', 'end', 'and', 'or', 'not', 'order', 'group', 'by', 'asc', 'desc', 'having', 'limit', 'number', 'string'],
+    userCode: `//这个文件用SQLParserGen.ts生成的\nimport { isWindowFrame } from '../tools/assert.js';`,
+    tokens: ['.', 'partition', 'over', 'left', 'join', 'from', 'on', 'id', 'select', 'where', ',', 'as', '<', '<=', '>', '>=', '=', '+', '-', '*', '/', '%', '(', ')', 'if', 'then', 'else', 'elseif', 'end', 'and', 'or', 'not', 'order', 'group', 'by', 'asc', 'desc', 'having', 'limit', 'number', 'string'],
     association: [
       { left: ['not'] },
       { left: ['or'] },
@@ -68,20 +72,32 @@ function gen() {
               }
             }
 
-            if (order_clause != undefined) {
-              tableView = tableView.orderBy(order_clause);
-            }
-
             if (limit_clause != undefined) {
               tableView = tableView.limit(limit_clause);
             }
 
-            //select作用在最后
-            if (select_clause.type == '*') {
-              return tableView;
-            } else {
-              return tableView.select(select_clause.nodes!);
+            for (let i = 0; i < select_clause.nodes.length; i++) {
+              let node = select_clause.nodes[i];
+              if (!isWindowFrame(node) && node.op == '*') {
+                let any_nodes = [] as ExpNode[];
+                for (let k in tableView.data[0]) {
+                  any_nodes.push({
+                    op: 'getfield',
+                    value: k,
+                    targetName: k,
+                  });
+                }
+                select_clause.nodes = [...select_clause.nodes.slice(0, i), ...any_nodes, ...select_clause.nodes.slice(i + 1)];
+              }
             }
+
+            tableView = tableView.select(select_clause.nodes!);
+
+            if (order_clause != undefined) {
+              tableView = tableView.orderBy(order_clause);
+            }
+
+            return tableView;
           },
         },
       },
@@ -89,24 +105,14 @@ function gen() {
         'select_clause:select select_list': {
           action: function ($): SelectList {
             return {
-              type: 'nodes',
               nodes: $[1] as ExpNode[],
             };
           },
         },
       },
       {
-        'select_clause:select *': {
-          action: function (): SelectList {
-            return {
-              type: '*',
-            };
-          },
-        },
-      },
-      {
         'select_list:select_list , select_item': {
-          action: function ($): ExpNode[] {
+          action: function ($): (ExpNode | WindowFrame)[] {
             let select_list = $[0] as ExpNode[];
             let select_item = $[2] as ExpNode;
             select_list.push(select_item);
@@ -116,14 +122,131 @@ function gen() {
       },
       {
         'select_list:select_item': {
-          action: function ($) {
+          action: function ($): (ExpNode | WindowFrame)[] {
             return [$[0] as ExpNode];
           },
         },
       },
       {
         'select_item:exp': {
-          action: function ($) {
+          action: function ($): ExpNode {
+            return $[0] as ExpNode;
+          },
+        },
+      },
+      {
+        'select_item:*': {
+          action: function ($): ExpNode {
+            return {
+              op: '*',
+              targetName: '*',
+            };
+          },
+        },
+      },
+      {
+        'select_item:call over ( partition_clause order_clause  )': {
+          action: function ($): WindowFrame {
+            let windowFunction = $[0] as ExpNode;
+            let partition = $[3] as ExpNode[];
+            let order = $[4] as ExpNode[] | undefined;
+            let partionName = '';
+            for (let i = 0; i < partition.length; i++) {
+              if (i == 0) {
+                partionName += partition[i].targetName;
+              } else {
+                partionName += ',' + partition[i].targetName;
+              }
+            }
+            let orderName = '';
+            for (let i = 0; order !== undefined && i < order.length; i++) {
+              if (i == 0) {
+                orderName += order[i].targetName;
+              } else {
+                orderName += ',' + order[i].targetName;
+              }
+            }
+            return {
+              windowFunction,
+              partition,
+              order,
+              targetName: `${windowFunction.targetName} over (partition by ${partionName} order by  ${orderName})`,
+            };
+          },
+        },
+      },
+      {
+        'select_item:call over ( partition_clause order_clause  ) as id': {
+          action: function ($): WindowFrame {
+            let windowFunction = $[0] as ExpNode;
+            let partition = $[3] as ExpNode[];
+            let order = $[4] as ExpNode[] | undefined;
+            let alias = $[7] as string;
+            let partionName = '';
+            for (let i = 0; i < partition.length; i++) {
+              if (i == 0) {
+                partionName += partition[i].targetName;
+              } else {
+                partionName += ',' + partition[i].targetName;
+              }
+            }
+            let orderName = '';
+            for (let i = 0; order !== undefined && i < order.length; i++) {
+              if (i == 0) {
+                orderName += order[i].targetName;
+              } else {
+                orderName += ',' + order[i].targetName;
+              }
+            }
+            return {
+              windowFunction,
+              partition,
+              order,
+              alias,
+              targetName: `${windowFunction.targetName} over (partition by ${partionName} order by  ${orderName}) as ${alias}`,
+            };
+          },
+        },
+      },
+      {
+        'partition_clause:': {
+          action: function ($): ExpNode[] {
+            return [
+              {
+                op: 'immediate_val',
+                value: 1,
+                targetName: 'partion by 1',
+              },
+            ];
+          },
+        },
+      }, //默认创建一个exp
+      {
+        'partition_clause:partition by partition_list': {
+          action: function ($): ExpNode[] {
+            return $[2] as ExpNode[];
+          },
+        },
+      },
+      {
+        'partition_list:partition_list , partition_item': {
+          action: function ($): ExpNode[] {
+            let partition_list = $[0] as ExpNode[];
+            let partition_item = $[2] as ExpNode;
+            return [...partition_list, partition_item];
+          },
+        },
+      },
+      {
+        'partition_list:partition_item': {
+          action: function ($): ExpNode[] {
+            return [$[0]] as ExpNode[];
+          },
+        },
+      },
+      {
+        'partition_item:exp': {
+          action: function ($): ExpNode {
             return $[0] as ExpNode;
           },
         },
@@ -670,7 +793,14 @@ function gen() {
         },
       },
       {
-        'exp:id ( argu_list )': {
+        'exp:call': {
+          action: function ($): ExpNode {
+            return $[0] as ExpNode;
+          },
+        },
+      },
+      {
+        'call:id ( argu_list )': {
           action: function ($): ExpNode {
             let id = $[0] as string;
             let args = $[2] as ExpNode[];

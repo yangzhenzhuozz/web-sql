@@ -1,21 +1,31 @@
-import { DataSet, SQLSession } from '../main.js';
+import { DataSet } from '../tools/DataSet.js';
+import { SQLSession } from '../tools/SQLSession.js';
 
+//测试多个窗口分区函数,每个分区里面有多个分区字段
 let sql = `
 select
-  t1.id,max(score),t1.id as v1
+  *, row_number() over(partition by id1 % 2,id2 order by id desc) as xxx
 from
-  t1 left join t2 as B on t1.id=B.idx
-group by t1.id
-order by max(score)
+  test
+order by id
 `;
+let arrWin = [
+  { id: 1, id1: 1, id2: 1 },
+  { id: 2, id1: 1, id2: 1 },
+  { id: 3, id1: 3, id2: 3 },
+  { id: 4, id1: 4, id2: 2 },
+  { id: 5, id1: 1, id2: 1 },
+];
+let dsWin = new DataSet(arrWin, 'test');
 let arr = [
-  { id: 1, name: '张三' },
-  { id: 2, name: '李四' },
+  { id: 1, name: '张三', tag: 1 },
+  { id: 1, name: '张三', tag: 2 },
+  { id: 2, name: '李四', tag: 3 },
 ];
 let arr2 = [
-  { idx: 2, score: 5 },
-  { idx: 2, score: 8 },
-  { idx: 3, score: 10 },
+  { id: 2, score: 5 },
+  { id: 2, score: 8 },
+  { id: 3, score: 10 },
 ];
 
 //创建两个数据集
@@ -39,6 +49,7 @@ session.reisgerUDF('max', {
 });
 session.registTableView(ds);
 session.registTableView(ds2);
+session.registTableView(dsWin);
 
 console.log(`开始执行`);
 console.time('Execution Time');

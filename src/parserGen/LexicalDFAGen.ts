@@ -4,6 +4,10 @@ import { YYTOKEN } from '../tools/SQLParserDeclare.d.js';
 import fs from 'fs';
 let rules: LexerRule<YYTOKEN>[] = [
   {reg: '[ \t\n\r]+',handler: function (text) {return {yytext: 'space',type: 'space',value: text,};},}, //prettier-ignore
+
+  {reg: 'partition',handler: function (text) {return {yytext: 'partition',type: text,value: text,};},}, // prettier-ignore
+  {reg: 'over',handler: function (text) {return {yytext: 'over',type: text,value: text,};},}, // prettier-ignore
+
   {reg: 'from',handler: function (text) {return {yytext: 'from',type: text,value: text,};},}, // prettier-ignore
   {reg: 'select',handler: function (text) {return {yytext: 'select',type: text,value: text,};},}, // prettier-ignore
   {reg: 'where',handler: function (text) {return {yytext: 'where',type: text,value: text,};},}, // prettier-ignore
@@ -42,7 +46,7 @@ let rules: LexerRule<YYTOKEN>[] = [
   {reg: 'having',handler: function (text) {return {yytext: 'having',type: text,value: text,};},}, // prettier-ignore
   {reg: 'limit',handler: function (text) {return {yytext: 'limit',type: text,value: text,};},}, // prettier-ignore
   // prettier-ignore
-  {reg: '[_a-zA-Z][a-zA-Z0-9]*',handler: function (text) {return {yytext: text,type: 'id',value: text,};},}, //id的优先级最低,避免把关键字识别成id
+  {reg: '[_a-zA-Z][a-zA-Z0-9_]*',handler: function (text) {return {yytext: text,type: 'id',value: text,};},}, //id的优先级最低,避免把关键字识别成id
   {
     reg: '[0-9]+\\.[0-9]+',
     handler: function (text) {
