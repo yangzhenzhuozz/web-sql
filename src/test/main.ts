@@ -4,7 +4,7 @@ import { SQLSession } from '../tools/SQLSession.js';
 //测试多个窗口分区函数,每个分区里面有多个分区字段
 let sql = `
 select
-  *, row_number() over(partition by id1 % 2,id2 order by id desc) as xxx
+  *, row_number() over(partition by id1 % 2,id2) as xxx
 from
   test
 order by id

@@ -18,7 +18,7 @@ export type UDF = {
       }
     | {
         type: 'windowFrame';
-        handler: (list: (valueType | undefined)[][]) => valueTypeList|undefined;
+        handler: (list: (valueType | undefined)[][]) => valueTypeList | undefined;
       };
 };
 
@@ -472,7 +472,7 @@ export class DataSet<T extends { [key: string]: any }> {
             break;
           }
 
-          //创建一个只有一行的ds
+          //创建一个窗口
           let frameDS = new DataSet(ds.data.slice(start, end), undefined, this.session);
 
           //开窗排序
@@ -580,23 +580,11 @@ export class DataSet<T extends { [key: string]: any }> {
     ret.tableNameToField = tableNameToField; //这里刷新之后可能取到不在group中的字段
     return ret;
   }
-  public orderBy(
-    exps: ExpNode[],
-    option?: {
-      start: number;
-      end: number;
-    }
-  ) {
+  public orderBy(exps: ExpNode[]) {
     let arr = [] as any[];
     let orderKeys = [] as { name: string; order: 'asc' | 'desc' }[];
-    let start = 0;
-    let end = this.data.length;
-    if (option != undefined) {
-      start = option.start;
-      end = option.end;
-    }
     let orderFields = [] as string[];
-    for (let i = start; i < end; i++) {
+    for (let i = 0; i < this.data.length; i++) {
       let row = this.data[i];
       let tmpRow = { ...row } as any;
       for (let exp of exps) {
