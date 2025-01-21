@@ -50,17 +50,17 @@ export class DataSet<T extends { [key: string]: any }> {
   }
 
   //用于创建t1.c1 => c1 t2.id=>t2.id 的映射(id在两个表中都有,c1只在t1中有,所以映射结果不同)
-  private createTableNameToField(arr: any[], t: string, duplicateKey?: Set<string>) {
+  private createTableNameToField(arr: any[], tableName: string, duplicateKey?: Set<string>) {
     let tableNameToField: {
       [key: string]: {
         [key: string]: string;
       };
-    } = { [t]: {} };
+    } = { [tableName]: {} };
     for (let k in arr[0]) {
       if (duplicateKey === undefined || !duplicateKey.has(k)) {
-        tableNameToField[t][k] = k;
+        tableNameToField[tableName][k] = k;
       } else {
-        tableNameToField[t][k] = `${this.name}.${k}`;
+        tableNameToField[tableName][k] = `${tableName}.${k}`;
       }
     }
     return tableNameToField;
