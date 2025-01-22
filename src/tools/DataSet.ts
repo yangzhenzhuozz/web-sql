@@ -379,42 +379,14 @@ export class DataSet<T extends { [key: string]: any }> {
 
   public select(exps: (ExpNode | WindowFrame)[]): DataSet<any> {
     let arr = [] as any[];
-    //不同的窗口函数
-    let windowFunctions = [] as {
-      keys: string[];
-      windowFunction: ExpNode;
-      alias?: string;
-      targetName: string;
-      order?: ExpNode[];
-    }[];
+    let windowFrames = [] as WindowFrame[];
     for (let row_idx = 0; row_idx < this.data.length; row_idx++) {
       let row = this.data[row_idx];
       let tmpRow = {} as any;
-      let partition_idx = 0;
       for (let i = 0; i < exps.length; i++) {
         let exp = exps[i];
         if (isWindowFrame(exp)) {
-          //把exp中的所有node全部select出来
-          let partitionKeyOfNowFun = [] as string[]; //只在第一行处理key，后面行都是重复数据，就不用处理了
-          for (let node of exp.partition) {
-            let cell = this.execExp(node, row);
-            let pk = `@framePartion_${partition_idx}_${cell.targetName!}`;
-            tmpRow[pk] = cell.value!;
-            partition_idx++;
-            if (row_idx == 0) {
-              partitionKeyOfNowFun.push(pk);
-            }
-          }
-          if (row_idx == 0) {
-            windowFunctions.push({
-              keys: partitionKeyOfNowFun,
-              windowFunction: exp.windowFunction,
-              alias: exp.alias,
-              targetName: exp.targetName,
-              order: exp.order,
-            });
-          }
-          // throw `unimpliment window frame`;
+          windowFrames.push(exp);
         } else {
           let cell = this.execExp(exp, row);
           if (tmpRow[cell.targetName!] !== undefined) {
@@ -429,94 +401,39 @@ export class DataSet<T extends { [key: string]: any }> {
     let ds = new DataSet(arr, undefined, this.session);
     ds.tableNameToField = this.tableNameToField; //select不更新tableNameToField
     ds.name = this.name;
-    if (windowFunctions.length > 0) {
+
+    if (windowFrames.length > 0) {
       console.log('开始处理窗口');
-      for (let winFun_idx = 0; winFun_idx < windowFunctions.length; winFun_idx++) {
-        let winfun = windowFunctions[winFun_idx];
-        let orderKeys = [] as ExpNode[];
-        for (let k_idx = 0; k_idx < winfun.keys.length; k_idx++) {
-          let k = winfun.keys[k_idx];
-          orderKeys.push({
-            op: 'order',
-            children: [
-              {
-                op: 'getfield',
-                value: k,
-                targetName: k,
-              },
-            ],
-            targetName: `@frame_${winFun_idx}_order_${k_idx}`,
-            order: 'asc',
-          });
+      for (let windowFrame of windowFrames) {
+        let tmpDs = ds.group(windowFrame.partition); //各个不同分区的frame
+        let frameResult = [] as any[];
+        //对每一个窗口帧进行处理
+        for (let line of tmpDs.data) {
+          let frame = line['@frameGroupValues'];
+          if (ds.session!.udf[windowFrame.windowFunction.value! as string].type == 'aggregate') {
+            let aggregateVal = ds.execExp(windowFrame.windowFunction, line).value;
+            for (let row of frame) {
+              row[windowFrame.alias ?? windowFrame.targetName] = aggregateVal;
+            }
+          } else if (ds.session!.udf[windowFrame.windowFunction.value! as string].type == 'windowFrame') {
+            let windowFrameVals = ds.execExp(windowFrame.windowFunction, line).value as valueTypeList;
+            for (let i = 0; i < windowFrameVals.length; i++) {
+              frame[i][windowFrame.alias ?? windowFrame.targetName] = windowFrameVals[i];
+            }
+          }
+          if (windowFrame.order != undefined) {
+            let frameDS = new DataSet(frame, undefined, this.session);
+            frameDS.tableNameToField = this.tableNameToField;
+            frame = frameDS.orderBy(windowFrame.order).data;
+          }
+          frameResult.push(...frame);
         }
-
-        ds = ds.orderBy(orderKeys); //先按照窗口key排序，取得各个窗口数据
-        let retArr = [];
-        for (let start = 0; ; ) {
-          let startRow = ds.data[start];
-          let end = start + 1;
-          for (; end < ds.data.length; end++) {
-            let isSame = true;
-            for (let pk of winfun.keys) {
-              if (startRow[pk] !== ds.data[end][pk]) {
-                isSame = false;
-                break;
-              }
-            }
-            if (!isSame) {
-              break;
-            }
-          }
-          if (start >= ds.data.length) {
-            break;
-          }
-
-          //创建一个窗口
-          let frameDS = new DataSet(ds.data.slice(start, end), undefined, this.session);
-
-          //开窗排序
-          if (winfun.order) {
-            frameDS = frameDS.orderBy(winfun.order);
-          }
-
-          let retRow = ds.execExp(winfun.windowFunction, { '@frameGroupValues': frameDS.data });
-          if (this.session!.udf[winfun.windowFunction.value! as string].type == 'aggregate') {
-            for (let frameRow of frameDS.data) {
-              if (winfun.alias) {
-                if (frameRow[winfun.alias] !== undefined) {
-                  throw `窗口函数重命名${winfun.alias}和select的名字重复`;
-                }
-                frameRow[winfun.alias] = <valueType>retRow.value;
-              } else {
-                frameRow[winfun.targetName] = <valueType>retRow.value;
-              }
-            }
-          } else {
-            for (let idx = 0; idx < frameDS.data.length; idx++) {
-              let frameRow = frameDS.data[idx];
-              if (winfun.alias) {
-                if (frameRow[winfun.alias] !== undefined) {
-                  throw `窗口函数重命名${winfun.alias}和select的名字重复`;
-                }
-                frameRow[winfun.alias] = (<valueTypeList>retRow.value)[idx];
-              } else {
-                frameRow[winfun.targetName] = (<valueTypeList>retRow.value)[idx];
-              }
-            }
-          }
-          for (let row_idx = 0; row_idx < frameDS.data.length; row_idx++) {
-            let row = frameDS.data[row_idx];
-            for (let k_idx = 0; k_idx < winfun.keys.length; k_idx++) {
-              delete row[winfun.keys[k_idx]];
-              delete row[`@frame_${winFun_idx}_order_${k_idx}`];
-            }
-            retArr.push(row);
-          }
-          start = end;
-        }
-        ds = new DataSet(retArr, undefined, this.session);
+        ds = new DataSet(frameResult, undefined, this.session);
+        ds.tableNameToField = this.tableNameToField;
+        ds.name = this.name;
       }
     }
+
     return ds;
   }
   public where(exp: ExpNode): DataSet<T> {
