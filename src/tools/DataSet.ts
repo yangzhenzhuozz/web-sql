@@ -492,6 +492,9 @@ export class DataSet<T extends { [key: string]: any }> {
       for (let k of groupKeys) {
         tmpRow[k] = group[0][k];
       }
+      for (let line of group){
+        delete line['@groupKeys'];
+      }
       tmpRow['@frameGroupValues'] = group;
       groupDs.push(tmpRow);
     }
