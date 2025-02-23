@@ -1,5 +1,5 @@
 import { assert } from './assert.js';
-import { DataSet, UDF } from './DataSet.js';
+import { DataSet, UDF, UDFHanler } from './DataSet.js';
 import { valueType } from './ExpTree.js';
 import { Lexical } from './Lexical.js';
 import Parse from './SQLParser.js';
@@ -48,18 +48,7 @@ export class SQLSession {
       dataset.session = this;
     }
   }
-  public reisgerUDF(
-    name: string,
-    obj:
-      | {
-          type: 'normal';
-          handler: (...args: any[]) => valueType | undefined;
-        }
-      | {
-          type: 'aggregate';
-          handler: (list: any[]) => valueType | undefined;
-        }
-  ) {
+  public reisgerUDF(name: string, obj: UDFHanler) {
     this.udf[name] = obj;
   }
   public sql(src: string): DataSet<any> {

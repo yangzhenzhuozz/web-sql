@@ -6,20 +6,21 @@ export interface FieldType {
   name: string;
   type: 'string' | 'number' | 'bigint' | 'boolean' | 'symbol' | 'undefined' | 'object' | 'function';
 }
+export type UDFHanler =
+  | {
+      type: 'normal';
+      handler: (...args: (valueType | undefined)[]) => valueType | undefined;
+    }
+  | {
+      type: 'aggregate';
+      handler: (list: (valueType | undefined)[][]) => valueType | undefined;
+    }
+  | {
+      type: 'windowFrame';
+      handler: (list: (valueType | undefined)[][]) => valueTypeList | undefined;
+    };
 export type UDF = {
-  [key: string]:
-    | {
-        type: 'normal';
-        handler: (...args: (valueType | undefined)[]) => valueType | undefined;
-      }
-    | {
-        type: 'aggregate';
-        handler: (list: (valueType | undefined)[][]) => valueType | undefined;
-      }
-    | {
-        type: 'windowFrame';
-        handler: (list: (valueType | undefined)[][]) => valueTypeList | undefined;
-      };
+  [key: string]: UDFHanler;
 };
 
 export class DataSet<T extends { [key: string]: any }> {
