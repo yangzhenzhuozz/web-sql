@@ -227,24 +227,37 @@ export class DataSet<T extends { [key: string]: any }> {
         l_Child = this.execExp(children![0], row);
         result = !l_Child.value!;
         break;
-      case 'if-else':
-        let if_else_condition = this.execExp(children![0], row);
-        if (if_else_condition.value!) {
-          result = this.execExp(children![1], row).value;
-        } else {
-          result = this.execExp(children![2], row).value;
-        }
-        break;
-      case 'if-elseif-else':
-        for (let i = 0; i < children!.length - 2; i += 2) {
-          let condition = this.execExp(children![i], row);
-          if (condition.value!) {
-            result = this.execExp(children![i + 1], row).value;
+      case 'case':
+        //如果没有else分支,最后一个是undefined
+        for (let i = 0; i < children!.length - 1; i++) {
+          let when = this.execExp(children![i].children![0], row).value;
+          if (when === true) {
+            result = this.execExp(children![i].children![1], row).value;
             break;
           }
         }
-        if (result === undefined) {
-          result = this.execExp(children![children!.length - 1], row).value;
+        if (result === undefined && children![children!.length - 1] != undefined) {
+          result = this.execExp(children![children!.length - 1].children![0], row).value;
+        }
+        if (result == undefined) {
+          result = null;
+        }
+        break;
+      case 'case-exp':
+        let case_exp = this.execExp(children![0], row).value;
+        //如果没有else分支,最后一个是undefined
+        for (let i = 1; i < children!.length - 1; i++) {
+          let when = this.execExp(children![i].children![0], row).value;
+          if (when == case_exp) {
+            result = this.execExp(children![i].children![1], row).value;
+            break;
+          }
+        }
+        if (result === undefined && children![children!.length - 1] != undefined) {
+          result = this.execExp(children![children!.length - 1].children![0], row).value;
+        }
+        if (result == undefined) {
+          result = null;
         }
         break;
       case 'call':
@@ -385,7 +398,7 @@ export class DataSet<T extends { [key: string]: any }> {
     for (let row_idx = 0; row_idx < this.data.length; row_idx++) {
       let tmpRow = {} as any;
       //默认把原始列全部隐藏,除非被显式的select
-      for(let k in this.data[row_idx]){
+      for (let k in this.data[row_idx]) {
         tmpRow[Symbol.for(k)] = this.data[row_idx][k];
       }
       for (let i = 0; i < exps.length; i++) {

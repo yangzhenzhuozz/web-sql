@@ -2,7 +2,7 @@ import fs from 'fs';
 import { Grammar, default as TSCC } from 'tscc';
 import { ExpNode, SelectList, WindowFrame } from '../tools/ExpTree.js';
 
-declare function isWindowFrame(obj:ExpNode|WindowFrame):obj is WindowFrame;
+declare function isWindowFrame(obj: ExpNode | WindowFrame): obj is WindowFrame;
 
 declare interface DataSet<T> {
   data: T[];
@@ -26,7 +26,7 @@ declare let Context: SQLSession;
 function gen() {
   let grammar: Grammar = {
     userCode: `//这个文件用SQLParserGen.ts生成的\nimport { isWindowFrame } from '../tools/assert.js';`,
-    tokens: ['.', 'partition', 'over', 'left', 'join', 'from', 'on', 'id', 'select', 'where', ',', 'as', '<', '<=', '>', '>=', '=', '+', '-', '*', '/', '%', '(', ')', 'if', 'then', 'else', 'elseif', 'end', 'and', 'or', 'not', 'order', 'group', 'by', 'asc', 'desc', 'having', 'limit', 'number', 'string'],
+    tokens: ['.', 'partition', 'over', 'left', 'join', 'from', 'on', 'id', 'select', 'where', ',', 'as', 'case', 'when', '<', '<=', '>', '>=', '=', '+', '-', '*', '/', '%', '(', ')', 'if', 'then', 'else', 'elseif', 'end', 'and', 'or', 'not', 'order', 'group', 'by', 'asc', 'desc', 'having', 'limit', 'number', 'string'],
     association: [
       { left: ['not'] },
       { left: ['or'] },
@@ -736,60 +736,79 @@ function gen() {
         },
       },
       {
-        'exp:if exp then exp else exp end': {
+        'exp:case when_list else_clause end': {
           action: function ($): ExpNode {
-            let condition = $[1] as ExpNode;
-            let exp1 = $[3] as ExpNode;
-            let exp2 = $[5] as ExpNode;
-            return {
-              op: 'if-else',
-              children: [condition, exp1, exp2],
-              targetName: `if ${condition.targetName} then ${exp1.targetName} else ${exp2.targetName}`,
-            };
-          },
-        },
-      },
-      {
-        'exp:if exp then exp elseif_list else exp end': {
-          action: function ($): ExpNode {
-            let condition = $[1] as ExpNode;
-            let exp1 = $[3] as ExpNode;
-            let elseif_list = $[4] as ExpNode[];
-            let else_exp = $[6] as ExpNode;
-            let elseif_list_name = '';
-            for (let i = 0; i < elseif_list.length; i += 2) {
-              elseif_list_name += ` elseif ${elseif_list[i].targetName} then ${elseif_list[i + 1].targetName}`;
+            let when_listTargetName = '';
+            for (let item of $[1] as ExpNode[]) {
+              when_listTargetName += item.targetName + '\n';
+            }
+            if ($[2] != undefined) {
+              when_listTargetName += ($[2] as ExpNode).targetName + '\n';
             }
             return {
-              op: 'if-elseif-else',
-              children: [condition, exp1, ...elseif_list, else_exp],
-              targetName: `if ${condition.targetName} then ${exp1.targetName} ${elseif_list_name} else ${else_exp.targetName}`,
+              op: 'case',
+              children: [...($[1] as ExpNode[]), $[2] as ExpNode],
+              targetName: `case ${when_listTargetName} end`,
             };
           },
         },
       },
       {
-        'elseif_list:elseif_list elseif_item': {
-          action: function ($): ExpNode[] {
-            let elseif_list = $[0] as ExpNode[];
-            let elseif_item = $[1] as ExpNode[];
-            return [...elseif_list, ...elseif_item];
+        'exp:case exp when_list else_clause end': {
+          action: function ($): ExpNode {
+            let when_listTargetName = ($[1] as ExpNode).targetName + '\n';
+            for (let item of $[2] as ExpNode[]) {
+              when_listTargetName += item.targetName + '\n';
+            }
+            if ($[3] != undefined) {
+              when_listTargetName += ($[3] as ExpNode).targetName + '\n';
+            }
+            return {
+              op: 'case-exp',
+              children: [$[1] as ExpNode, ...($[2] as ExpNode[]), $[3] as ExpNode],
+              targetName: `case ${when_listTargetName} end`,
+            };
           },
         },
       },
       {
-        'elseif_list:elseif_item': {
+        'when_list:when_list when_clause': {
           action: function ($): ExpNode[] {
-            return $[0] as ExpNode[];
+            let when_list = $[0] as ExpNode[];
+            let when_clause = $[1] as ExpNode;
+            return [...when_list, when_clause];
           },
         },
       },
       {
-        'elseif_item:elseif exp then exp': {
+        'when_list:when_clause': {
           action: function ($): ExpNode[] {
-            let exp = $[1] as ExpNode;
-            let else_exp = $[3] as ExpNode;
-            return [exp, else_exp];
+            return [$[0] as ExpNode];
+          },
+        },
+      },
+      {
+        'when_clause:when exp then exp': {
+          action: function ($): ExpNode {
+            return {
+              op: 'when',
+              children: [$[1] as ExpNode, $[3] as ExpNode],
+              targetName: `when ${$[1].targetName} then ${$[3].targetName}`,
+            };
+          },
+        },
+      },
+      {
+        'else_clause:': {},
+      },
+      {
+        'else_clause:else exp': {
+          action: function ($): ExpNode {
+            return {
+              op: 'else',
+              children: [$[1] as ExpNode],
+              targetName: `else ${$[1].targetName}`,
+            };
           },
         },
       },
