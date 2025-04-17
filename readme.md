@@ -2,7 +2,7 @@
 npm i web-sql --production
 # demo
 
-```
+```js
 import { DataSet } from 'web-sql';
 import { SQLSession } from 'web-sql';
 let testCase: { [key: string]: string } = {
@@ -123,12 +123,20 @@ select
 from
   t1 left join t2 on 1=1
 `,
+  code15: `
+select
+  t1.gender
+from
+  t1 left join t2 on 1=1
+where t1.gender is null
+`,
 };
 
 let arr = [
   { id: 1, gender: '男', name: 'john', score: 10 },
   { id: 2, gender: '女', name: 'kelly', score: 11 },
   { id: 12, gender: '女', name: 'danny', score: 15 },
+  { id: 12, gender: null, name: 'danny', score: 15 },
 ];
 let arr2 = [
   { id: 2, idx: 2, score2: 15 },

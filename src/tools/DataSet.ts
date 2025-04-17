@@ -42,10 +42,10 @@ export class DataSet<T extends { [key: string]: any }> {
     this.name = name;
     this.data = arr;
     // this.fiels = new Set(Object.keys(arr[0]));
-    if (name != undefined) {
+    if (name !== undefined) {
       this.tableNameToField = this.createTableNameToField(arr, name);
     }
-    if (session != undefined) {
+    if (session !== undefined) {
       this.session = session;
     }
   }
@@ -105,11 +105,11 @@ export class DataSet<T extends { [key: string]: any }> {
      * order by
      *  left(name,4) //会使用Symbol.for('left(name,4)')做key
      */
-    if (exp.op != 'immediate_val' && (row[exp.targetName] != undefined || row[Symbol.for(exp.targetName)] != undefined)) {
+    if (exp.op != 'immediate_val' && (row[exp.targetName] !== undefined || row[Symbol.for(exp.targetName)] !== undefined)) {
       return {
         op: 'immediate_val',
         targetName: exp.targetName,
-        value: row[exp.targetName] | row[Symbol.for(exp.targetName)],
+        value: row[exp.targetName] !== undefined ? row[exp.targetName] : row[Symbol.for(exp.targetName)],
       };
     }
 
@@ -155,77 +155,143 @@ export class DataSet<T extends { [key: string]: any }> {
       case 'add':
         l_Child = this.execExp(children![0], row);
         r_Child = this.execExp(children![1], row);
-        if (typeof l_Child.value !== 'number' || typeof r_Child.value !== 'number') {
-          result = l_Child.value!.toString() + r_Child.value!.toString();
+        if (l_Child.value === null || r_Child.value === null) {
+          result = null;
         } else {
-          result = l_Child.value! + r_Child.value!;
+          if (typeof l_Child.value !== 'number' || typeof r_Child.value !== 'number') {
+            result = l_Child.value!.toString() + r_Child.value!.toString();
+          } else {
+            result = l_Child.value! + r_Child.value!;
+          }
         }
         break;
       case 'sub':
         l_Child = this.execExp(children![0], row);
         r_Child = this.execExp(children![1], row);
-        if (typeof l_Child.value === 'number' && typeof r_Child.value === 'number') {
-          result = l_Child.value! - r_Child.value!;
+        if (l_Child.value === null || r_Child.value === null) {
+          result = null;
         } else {
-          throw 'Unsupported type';
+          if (typeof l_Child.value === 'number' && typeof r_Child.value === 'number') {
+            result = l_Child.value! - r_Child.value!;
+          } else {
+            throw 'Unsupported type';
+          }
         }
         break;
       case 'mul':
         l_Child = this.execExp(children![0], row);
         r_Child = this.execExp(children![1], row);
-        if (typeof l_Child.value === 'number' && typeof r_Child.value === 'number') {
-          result = l_Child.value! * r_Child.value!;
+        if (l_Child.value === null || r_Child.value === null) {
+          result = null;
         } else {
-          throw 'Unsupported type';
+          if (typeof l_Child.value === 'number' && typeof r_Child.value === 'number') {
+            result = l_Child.value! * r_Child.value!;
+          } else {
+            throw 'Unsupported type';
+          }
         }
         break;
       case 'div':
         l_Child = this.execExp(children![0], row);
         r_Child = this.execExp(children![1], row);
-        if (typeof l_Child.value === 'number' && typeof r_Child.value === 'number') {
-          result = l_Child.value! / r_Child.value!;
+        if (l_Child.value === null || r_Child.value === null) {
+          result = null;
         } else {
-          throw 'Unsupported type';
+          if (typeof l_Child.value === 'number' && typeof r_Child.value === 'number') {
+            result = l_Child.value! / r_Child.value!;
+          } else {
+            throw 'Unsupported type';
+          }
         }
         break;
       case 'gt':
         l_Child = this.execExp(children![0], row);
         r_Child = this.execExp(children![1], row);
-        result = l_Child.value! > r_Child.value!;
+        if (l_Child.value === null || r_Child.value === null) {
+          result = null;
+        } else {
+          result = l_Child.value! > r_Child.value!;
+        }
         break;
       case 'ge':
         l_Child = this.execExp(children![0], row);
         r_Child = this.execExp(children![1], row);
-        result = l_Child.value! >= r_Child.value!;
+        if (l_Child.value === null || r_Child.value === null) {
+          result = null;
+        } else {
+          result = l_Child.value! >= r_Child.value!;
+        }
         break;
       case 'lt':
         l_Child = this.execExp(children![0], row);
         r_Child = this.execExp(children![1], row);
-        result = l_Child.value! < r_Child.value!;
+        if (l_Child.value === null || r_Child.value === null) {
+          result = null;
+        } else {
+          result = l_Child.value! < r_Child.value!;
+        }
         break;
       case 'le':
         l_Child = this.execExp(children![0], row);
         r_Child = this.execExp(children![1], row);
-        result = l_Child.value! <= r_Child.value!;
+        if (l_Child.value === null || r_Child.value === null) {
+          result = null;
+        } else {
+          result = l_Child.value! <= r_Child.value!;
+        }
         break;
       case 'eq':
         l_Child = this.execExp(children![0], row);
         r_Child = this.execExp(children![1], row);
-        result = l_Child.value! == r_Child.value!;
+        if (l_Child.value === null || r_Child.value === null) {
+          result = null;
+        } else {
+          result = l_Child.value! == r_Child.value!;
+        }
+        break;
+      case 'ne':
+        l_Child = this.execExp(children![0], row);
+        r_Child = this.execExp(children![1], row);
+        if (l_Child.value === null || r_Child.value === null) {
+          result = null;
+        } else {
+          result = l_Child.value != r_Child.value;
+        }
         break;
       case 'and':
         l_Child = this.execExp(children![0], row);
         r_Child = this.execExp(children![1], row);
-        result = l_Child.value! && r_Child.value!;
+        if (l_Child.value === null || r_Child.value === null) {
+          result = null;
+        } else {
+          result = l_Child.value! && r_Child.value!;
+        }
         break;
       case 'or':
         l_Child = this.execExp(children![0], row);
         r_Child = this.execExp(children![1], row);
-        result = l_Child.value! || r_Child.value!;
+        if (l_Child.value === null || r_Child.value === null) {
+          result = null;
+        } else {
+          result = l_Child.value! || r_Child.value!;
+        }
         break;
       case 'not':
         l_Child = this.execExp(children![0], row);
-        result = !l_Child.value!;
+
+        if (l_Child.value === null) {
+          result = null;
+        } else {
+          result = !l_Child.value!;
+        }
+        break;
+      case 'is_null':
+        l_Child = this.execExp(children![0], row);
+        result = l_Child.value === null;
+        break;
+      case 'is_not_null':
+        l_Child = this.execExp(children![0], row);
+        result = l_Child.value !== null;
         break;
       case 'case':
         //如果没有else分支,最后一个是undefined
@@ -236,10 +302,10 @@ export class DataSet<T extends { [key: string]: any }> {
             break;
           }
         }
-        if (result === undefined && children![children!.length - 1] != undefined) {
+        if (result === undefined && children![children!.length - 1] !== undefined) {
           result = this.execExp(children![children!.length - 1].children![0], row).value;
         }
-        if (result == undefined) {
+        if (result === undefined) {
           result = null;
         }
         break;
@@ -253,10 +319,10 @@ export class DataSet<T extends { [key: string]: any }> {
             break;
           }
         }
-        if (result === undefined && children![children!.length - 1] != undefined) {
+        if (result === undefined && children![children!.length - 1] !== undefined) {
           result = this.execExp(children![children!.length - 1].children![0], row).value;
         }
-        if (result == undefined) {
+        if (result === undefined) {
           result = null;
         }
         break;
@@ -266,7 +332,7 @@ export class DataSet<T extends { [key: string]: any }> {
           throw `未定义函数:${fun_name}`;
         }
         if (this.session!.udf[fun_name].type == 'aggregate') {
-          if (row[Symbol.for('@frameGroupValues')] == undefined) {
+          if (row[Symbol.for('@frameGroupValues')] === undefined) {
             throw `还没有group by或者开窗不能使用聚合函数${fun_name}`;
           } else {
             let list = [] as valueType[][];
@@ -287,7 +353,7 @@ export class DataSet<T extends { [key: string]: any }> {
           }
           result = this.session!.udf[fun_name].handler(...args);
         } else {
-          if (row[Symbol.for('@frameGroupValues')] == undefined) {
+          if (row[Symbol.for('@frameGroupValues')] === undefined) {
             throw `还没有开窗,不能使用窗口函数${fun_name}`;
           } else {
             let list = [] as valueType[][];
@@ -430,7 +496,7 @@ export class DataSet<T extends { [key: string]: any }> {
         for (let line of tmpDs.data) {
           let frame = line[Symbol.for('@frameGroupValues')];
 
-          if (windowFrame.order != undefined) {
+          if (windowFrame.order !== undefined) {
             let frameDS = new DataSet(frame, undefined, this.session);
             frameDS.tableNameToField = this.tableNameToField;
             frame = frameDS.orderBy(windowFrame.order).data;
@@ -577,8 +643,8 @@ export class DataSet<T extends { [key: string]: any }> {
   public leftJoin(other: DataSet<any>, exp: ExpNode): DataSet<any> {
     let retArr = [] as any[];
 
-    assert(this.name != undefined);
-    assert(other.name != undefined);
+    assert(this.name !== undefined);
+    assert(other.name !== undefined);
 
     //构造key
     let tableKey: {
@@ -629,7 +695,7 @@ export class DataSet<T extends { [key: string]: any }> {
       let f1 = exp1.op == 'getfield' ? keyTable[exp1.value as string] : tableKey[exp1.value as string];
       let f2 = exp2.op == 'getfield' ? keyTable[exp2.value as string] : tableKey[exp2.value as string];
 
-      if (f1 != undefined && f2 != undefined && f1.table != f2.table) {
+      if (f1 !== undefined && f2 !== undefined && f1.table != f2.table) {
         //开始连接
         retArr = this.sortMergeJoin(other, {
           t1: this.name,

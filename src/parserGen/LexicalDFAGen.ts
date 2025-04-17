@@ -3,50 +3,54 @@ import { LexerRule } from 'tslex/dist/automaton.js';
 import { YYTOKEN } from '../tools/SQLParserDeclare.d.js';
 import fs from 'fs';
 let rules: LexerRule<YYTOKEN>[] = [
-  {reg: '[ \t\n\r]+',handler: function (text) {return {yytext: 'space',type: 'space',value: text,};},}, //prettier-ignore
+  {reg: '[ \t\n\r]+',handler: function (text) {return {yytext: text,type: 'space',value: text,};},}, //prettier-ignore
 
-  {reg: 'partition',handler: function (text) {return {yytext: 'partition',type: text,value: text,};},}, // prettier-ignore
-  {reg: 'over',handler: function (text) {return {yytext: 'over',type: text,value: text,};},}, // prettier-ignore
+  {reg: 'partition',handler: function (text) {return {yytext: text,type: text,value: text,};},}, // prettier-ignore
+  {reg: 'over',handler: function (text) {return {yytext: text,type: text,value: text,};},}, // prettier-ignore
 
-  {reg: 'case',handler: function (text) {return {yytext: 'case',type: text,value: text,};},}, // prettier-ignore
-  {reg: 'when',handler: function (text) {return {yytext: 'when',type: text,value: text,};},}, // prettier-ignore
-  {reg: 'from',handler: function (text) {return {yytext: 'from',type: text,value: text,};},}, // prettier-ignore
-  {reg: 'select',handler: function (text) {return {yytext: 'select',type: text,value: text,};},}, // prettier-ignore
-  {reg: 'where',handler: function (text) {return {yytext: 'where',type: text,value: text,};},}, // prettier-ignore
-  {reg: 'left',handler: function (text) {return {yytext: 'left',type: text,value: text,};},}, // prettier-ignore
-  {reg: 'join',handler: function (text) {return {yytext: 'join',type: text,value: text,};},}, // prettier-ignore
-  {reg: 'on',handler: function (text) {return {yytext: 'on',type: text,value: text,};},}, // prettier-ignore
-  {reg: ',',handler: function (text) {return {yytext: ',',type: text,value: text,};},}, // prettier-ignore
-  {reg: 'as',handler: function (text) {return {yytext: 'as',type: text,value: text,};},}, // prettier-ignore
-  {reg: '<',handler: function (text) {return {yytext: '<',type: text,value: text,};},}, // prettier-ignore
-  {reg: '<=',handler: function (text) {return {yytext: '<=',type: text,value: text,};},}, // prettier-ignore
-  {reg: '=',handler: function (text) {return {yytext: '=',type: text,value: text,};},}, // prettier-ignore
-  {reg: '>',handler: function (text) {return {yytext: '>',type: text,value: text,};},}, // prettier-ignore
-  {reg: '>=',handler: function (text) {return {yytext: '>=',type: text,value: text,};},}, // prettier-ignore
-  {reg: '%',handler: function (text) {return {yytext: '%',type: text,value: text,};},}, // prettier-ignore
-  {reg: '\\*',handler: function (text) {return {yytext: '*',type: text,value: text,};},}, // prettier-ignore
-  {reg: '\\.',handler: function (text) {return {yytext: '.',type: text,value: text,};},}, // prettier-ignore
-  {reg: '\\+',handler: function (text) {return {yytext: '\\+',type: text,value: text,};},}, // prettier-ignore
-  {reg: '\\-',handler: function (text) {return {yytext: '\\-',type: text,value: text,};},}, // prettier-ignore
-  {reg: '\\*',handler: function (text) {return {yytext: '\\*',type: text,value: text,};},}, // prettier-ignore
-  {reg: '/',handler: function (text) {return {yytext: '/',type: text,value: text,};},}, // prettier-ignore
-  {reg: '\\(',handler: function (text) {return {yytext: '\\(',type: text,value: text,};},}, // prettier-ignore
-  {reg: '\\)',handler: function (text) {return {yytext: '\\)',type: text,value: text,};},}, // prettier-ignore
-  {reg: 'if',handler: function (text) {return {yytext: 'if',type: text,value: text,};},}, // prettier-ignore
-  {reg: 'then',handler: function (text) {return {yytext: 'then',type: text,value: text,};},}, // prettier-ignore
-  {reg: 'else',handler: function (text) {return {yytext: 'else',type: text,value: text,};},}, // prettier-ignore
-  {reg: 'elseif',handler: function (text) {return {yytext: 'elseif',type: text,value: text,};},}, // prettier-ignore
-  {reg: 'end',handler: function (text) {return {yytext: 'end',type: text,value: text,};},}, // prettier-ignore
-  {reg: 'and',handler: function (text) {return {yytext: 'and',type: text,value: text,};},}, // prettier-ignore
-  {reg: 'or',handler: function (text) {return {yytext: 'or',type: text,value: text,};},}, // prettier-ignore
-  {reg: 'not',handler: function (text) {return {yytext: 'not',type: text,value: text,};},}, // prettier-ignore
-  {reg: 'order',handler: function (text) {return {yytext: 'order',type: text,value: text,};},}, // prettier-ignore
-  {reg: 'group',handler: function (text) {return {yytext: 'group',type: text,value: text,};},}, // prettier-ignore
-  {reg: 'by',handler: function (text) {return {yytext: 'by',type: text,value: text,};},}, // prettier-ignore
-  {reg: 'asc',handler: function (text) {return {yytext: 'asc',type: text,value: text,};},}, // prettier-ignore
-  {reg: 'desc',handler: function (text) {return {yytext: 'desc',type: text,value: text,};},}, // prettier-ignore
-  {reg: 'having',handler: function (text) {return {yytext: 'having',type: text,value: text,};},}, // prettier-ignore
-  {reg: 'limit',handler: function (text) {return {yytext: 'limit',type: text,value: text,};},}, // prettier-ignore
+  {reg: 'case',handler: function (text) {return {yytext: text,type: text,value: text,};},}, // prettier-ignore
+  {reg: 'when',handler: function (text) {return {yytext: text,type: text,value: text,};},}, // prettier-ignore
+  {reg: 'from',handler: function (text) {return {yytext: text,type: text,value: text,};},}, // prettier-ignore
+  {reg: 'select',handler: function (text) {return {yytext: text,type: text,value: text,};},}, // prettier-ignore
+  {reg: 'where',handler: function (text) {return {yytext: text,type: text,value: text,};},}, // prettier-ignore
+  {reg: 'left',handler: function (text) {return {yytext: text,type: text,value: text,};},}, // prettier-ignore
+  {reg: 'join',handler: function (text) {return {yytext: text,type: text,value: text,};},}, // prettier-ignore
+  {reg: 'on',handler: function (text) {return {yytext: text,type: text,value: text,};},}, // prettier-ignore
+  {reg: ',',handler: function (text) {return {yytext: text,type: text,value: text,};},}, // prettier-ignore
+  {reg: 'as',handler: function (text) {return {yytext: text,type: text,value: text,};},}, // prettier-ignore
+  {reg: '<',handler: function (text) {return {yytext: text,type: text,value: text,};},}, // prettier-ignore
+  {reg: '<=',handler: function (text) {return {yytext: text,type: text,value: text,};},}, // prettier-ignore
+  {reg: '=',handler: function (text) {return {yytext: text,type: text,value: text,};},}, // prettier-ignore
+  {reg: '<>',handler: function (text) {return {yytext: text,type: '!=',value: text,};},}, // prettier-ignore
+  {reg: '!=',handler: function (text) {return {yytext: text,type: text,value: text,};},}, // prettier-ignore
+  {reg: '>',handler: function (text) {return {yytext: text,type: text,value: text,};},}, // prettier-ignore
+  {reg: '>=',handler: function (text) {return {yytext: text,type: text,value: text,};},}, // prettier-ignore
+  {reg: '%',handler: function (text) {return {yytext: text,type: text,value: text,};},}, // prettier-ignore
+  {reg: '\\*',handler: function (text) {return {yytext: text,type: text,value: text,};},}, // prettier-ignore
+  {reg: '\\.',handler: function (text) {return {yytext: text,type: text,value: text,};},}, // prettier-ignore
+  {reg: '\\+',handler: function (text) {return {yytext: text,type: text,value: text,};},}, // prettier-ignore
+  {reg: '\\-',handler: function (text) {return {yytext: text,type: text,value: text,};},}, // prettier-ignore
+  {reg: '\\*',handler: function (text) {return {yytext: text,type: text,value: text,};},}, // prettier-ignore
+  {reg: '/',handler: function (text) {return {yytext: text,type: text,value: text,};},}, // prettier-ignore
+  {reg: '\\(',handler: function (text) {return {yytext: text,type: text,value: text,};},}, // prettier-ignore
+  {reg: '\\)',handler: function (text) {return {yytext: text,type: text,value: text,};},}, // prettier-ignore
+  {reg: 'if',handler: function (text) {return {yytext: text,type: text,value: text,};},}, // prettier-ignore
+  {reg: 'then',handler: function (text) {return {yytext: text,type: text,value: text,};},}, // prettier-ignore
+  {reg: 'else',handler: function (text) {return {yytext: text,type: text,value: text,};},}, // prettier-ignore
+  {reg: 'elseif',handler: function (text) {return {yytext: text,type: text,value: text,};},}, // prettier-ignore
+  {reg: 'end',handler: function (text) {return {yytext: text,type: text,value: text,};},}, // prettier-ignore
+  {reg: 'and',handler: function (text) {return {yytext: text,type: text,value: text,};},}, // prettier-ignore
+  {reg: 'or',handler: function (text) {return {yytext: text,type: text,value: text,};},}, // prettier-ignore
+  {reg: 'not',handler: function (text) {return {yytext: text,type: text,value: text,};},}, // prettier-ignore
+  {reg: 'order',handler: function (text) {return {yytext: text,type: text,value: text,};},}, // prettier-ignore
+  {reg: 'group',handler: function (text) {return {yytext: text,type: text,value: text,};},}, // prettier-ignore
+  {reg: 'by',handler: function (text) {return {yytext: text,type: text,value: text,};},}, // prettier-ignore
+  {reg: 'asc',handler: function (text) {return {yytext: text,type: text,value: text,};},}, // prettier-ignore
+  {reg: 'desc',handler: function (text) {return {yytext: text,type: text,value: text,};},}, // prettier-ignore
+  {reg: 'having',handler: function (text) {return {yytext: text,type: text,value: text,};},}, // prettier-ignore
+  {reg: 'limit',handler: function (text) {return {yytext: text,type: text,value: text,};},}, // prettier-ignore
+  {reg: 'is',handler: function (text) {return {yytext: text,type: text,value: text,};},}, // prettier-ignore
+  {reg: 'null',handler: function (text) {return {yytext: text,type: text,value: null,};},}, // prettier-ignore
   // prettier-ignore
   {reg: '[_a-zA-Z][a-zA-Z0-9_]*',handler: function (text) {return {yytext: text,type: 'id',value: text,};},}, //id的优先级最低,避免把关键字识别成id
   {

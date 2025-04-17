@@ -4,15 +4,16 @@ import { SQLSession } from '../tools/SQLSession.js';
 //测试多个窗口分区函数,每个分区里面有多个分区字段
 let sql = `
 select
-  *,case when 1=1 then 'a' else 'dd' end as cc, row_number() over()
+id2,
+test.id2 is not null
 from
   test
-order by id1 asc
+where id2 <> 2
 `;
 let arr = [];
-let size = 100000;
-for (let i = 0; i < size; i++) {
-  arr.push({ id1: i, id2: size - i });
+let size = 5;
+for (let i = 1; i <= size; i++) {
+  arr.push({ id1: i, id2: i < 2 ? null : i });
 }
 let session = new SQLSession();
 session.registTableView(new DataSet(arr, 'test'));

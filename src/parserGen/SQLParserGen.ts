@@ -26,12 +26,58 @@ declare let Context: SQLSession;
 function gen() {
   let grammar: Grammar = {
     userCode: `//这个文件用SQLParserGen.ts生成的\nimport { isWindowFrame } from '../tools/assert.js';`,
-    tokens: ['.', 'partition', 'over', 'left', 'join', 'from', 'on', 'id', 'select', 'where', ',', 'as', 'case', 'when', '<', '<=', '>', '>=', '=', '+', '-', '*', '/', '%', '(', ')', 'if', 'then', 'else', 'elseif', 'end', 'and', 'or', 'not', 'order', 'group', 'by', 'asc', 'desc', 'having', 'limit', 'number', 'string'],
+    tokens: [
+      '.',
+      'partition',
+      'over',
+      'left',
+      'join',
+      'from',
+      'on',
+      'id',
+      'select',
+      'where',
+      ',',
+      'as',
+      'is',
+      'null',
+      'case',
+      'when',
+      '<',
+      '<=',
+      '>',
+      '>=',
+      '=',
+      '+',
+      '-',
+      '*',
+      '/',
+      '%',
+      '(',
+      ')',
+      'if',
+      'then',
+      'else',
+      'elseif',
+      'end',
+      'and',
+      'or',
+      'not',
+      'order',
+      'group',
+      'by',
+      'asc',
+      'desc',
+      'having',
+      'limit',
+      'number',
+      'string',
+    ],
     association: [
       { left: ['not'] },
       { left: ['or'] },
       { left: ['and'] },
-      { nonassoc: ['<', '<=', '=', '>', '>='] },
+      { left: ['is', '<', '<=', '=', '>', '>=', '!='] },
       { left: ['%'] },
       { left: ['+', '-'] },
       { left: ['*', '/'] },
@@ -676,6 +722,19 @@ function gen() {
         },
       },
       {
+        'exp:exp != exp': {
+          action: function ($): ExpNode {
+            let e1 = $[0] as ExpNode;
+            let e2 = $[2] as ExpNode;
+            return {
+              op: 'ne',
+              children: [e1, e2],
+              targetName: `${e1.targetName} = ${e2.targetName}`,
+            };
+          },
+        },
+      },
+      {
         'exp:exp / exp': {
           action: function ($): ExpNode {
             let e1 = $[0] as ExpNode;
@@ -731,6 +790,30 @@ function gen() {
               op: 'not',
               children: [exp],
               targetName: `not ${exp.targetName}`,
+            };
+          },
+        },
+      },
+      {
+        'exp:exp is null': {
+          action: function ($): ExpNode {
+            let exp = $[0] as ExpNode;
+            return {
+              op: 'is_null',
+              children: [exp],
+              targetName: `${exp.targetName} is null`,
+            };
+          },
+        },
+      },
+      {
+        'exp:exp is not null': {
+          action: function ($): ExpNode {
+            let exp = $[0] as ExpNode;
+            return {
+              op: 'is_not_null',
+              children: [exp],
+              targetName: `${exp.targetName} is not null`,
             };
           },
         },
