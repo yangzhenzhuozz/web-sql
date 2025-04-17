@@ -1,7 +1,7 @@
 {
-  "name": "web-sql",
-  "version": "1.0.0",
-  "description": "这是一个web-sql库",
+  "name": "toysql-in-js",
+  "version": "1.0.1",
+  "description": "Write query SQL directly in your JavaScript",
   "license": "ISC",
   "author": "",
   "type": "module",
@@ -15,7 +15,7 @@
     "LexicalDFAGen": "npm run buildLexicalDFAGen && node ./dist/parserGen/LexicalDFAGen.js",
     "build": "npm run LexicalDFAGen && tsc -p tsconfig.json",
     "pack": "npm run build && npm pack"
-},
+  },
   "files": [
     "dist/tools",
     "dist/main.d.ts",
@@ -23,18 +23,18 @@
     "src"
   ],
   "dependencies": {
-    "tslex": "file:../tslex/tslex-1.0.0.tgz"
+    "tscc-lr1": "^1.0.0",
+    "tslex": "^1.0.0"
   },
   "devDependencies": {
-    "@types/node": "^22.10.7",
-    "tscc": "file:../tscc/tscc-1.0.0.tgz"
+    "@types/node": "^22.10.7"
   },
   "repository": {
     "type": "git",
-    "url": "git+https://github.com/yangzhenzhuozz/web-sql.git"
+    "url": "git+https://github.com/yangzhenzhuozz/toysql-in-js.git"
   },
   "bugs": {
-    "url": "https://github.com/yangzhenzhuozz/web-sql/issues"
+    "url": "https://github.com/yangzhenzhuozz/toysql-in-js/issues"
   },
-  "homepage": "https://github.com/yangzhenzhuozz/web-sql#readme"
+  "homepage": "https://github.com/yangzhenzhuozz/toysql-in-js#readme"
 }

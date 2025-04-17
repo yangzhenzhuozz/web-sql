@@ -1,5 +1,5 @@
 import fs from 'fs';
-import { Grammar, default as TSCC } from 'tscc';
+import { Grammar, default as TSCC } from 'tscc-lr1';
 import { ExpNode, SelectList, WindowFrame } from '../tools/ExpTree.js';
 
 declare function isWindowFrame(obj: ExpNode | WindowFrame): obj is WindowFrame;
