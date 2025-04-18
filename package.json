@@ -23,8 +23,8 @@
     "src"
   ],
   "dependencies": {
-    "tscc-lr1": "^1.0.0",
-    "tslex": "^1.0.0"
+    "tscc-lr1": "^1.0.1",
+    "tslex": "^1.0.1"
   },
   "devDependencies": {
     "@types/node": "^22.10.7"
