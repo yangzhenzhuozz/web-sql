@@ -72,6 +72,8 @@ function gen() {
       'limit',
       'number',
       'string',
+      'cast',
+      'type',
     ],
     association: [
       { left: ['not'] },
@@ -813,6 +815,20 @@ function gen() {
             return {
               op: 'is_not_null',
               children: [exp],
+              targetName: `${exp.targetName} is not null`,
+            };
+          },
+        },
+      },
+      {
+        'exp:cast ( exp as type )': {
+          action: function ($): ExpNode {
+            let exp = $[2] as ExpNode;
+            let type = $[4] as 'number' | 'string' | 'boolean';
+            return {
+              op: 'cast',
+              children: [exp],
+              cast_type: type,
               targetName: `${exp.targetName} is not null`,
             };
           },

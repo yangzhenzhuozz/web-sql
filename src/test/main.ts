@@ -4,11 +4,10 @@ import { SQLSession } from '../tools/SQLSession.js';
 //测试多个窗口分区函数,每个分区里面有多个分区字段
 let sql = `
 select
-id2,
-test.id2 is not null
+cast(id1 % 2 as string)
 from
   test
-where id2 <> 2
+group by id1 % 2
 `;
 let arr = [];
 let size = 5;

@@ -23,7 +23,7 @@ export type UDF = {
   [key: string]: UDFHanler;
 };
 
-export class DataSet<T extends { [key: string]: any }> {
+export class DataSet<T extends { [key: string | symbol]: any }> {
   public data: T[] = [];
   public name?: string;
   public session: SQLSession | undefined;
@@ -293,6 +293,28 @@ export class DataSet<T extends { [key: string]: any }> {
         l_Child = this.execExp(children![0], row);
         result = l_Child.value !== null;
         break;
+      case 'cast':
+        l_Child = this.execExp(children![0], row);
+        if (l_Child.value === null) {
+          result = null;
+        } else {
+          assert(exp.cast_type != undefined);
+          switch (exp.cast_type) {
+            case 'string':
+              result = String(l_Child.value);
+              break;
+            case 'boolean':
+              result = Boolean(l_Child.value);
+              break;
+            case 'number':
+              result = Number(l_Child.value);
+              break;
+            default:
+              result = l_Child.value;
+              break;
+          }
+        }
+        break;
       case 'case':
         //如果没有else分支,最后一个是undefined
         for (let i = 0; i < children!.length - 1; i++) {
@@ -466,6 +488,9 @@ export class DataSet<T extends { [key: string]: any }> {
       //默认把原始列全部隐藏,除非被显式的select
       for (let k in this.data[row_idx]) {
         tmpRow[Symbol.for(k)] = this.data[row_idx][k];
+      }
+      for (let k of Object.getOwnPropertySymbols(this.data[row_idx])) {
+        tmpRow[k] = this.data[row_idx][k];
       }
       for (let i = 0; i < exps.length; i++) {
         let exp = exps[i];

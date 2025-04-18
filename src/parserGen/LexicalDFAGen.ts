@@ -51,6 +51,10 @@ let rules: LexerRule<YYTOKEN>[] = [
   {reg: 'limit',handler: function (text) {return {yytext: text,type: text,value: text,};},}, // prettier-ignore
   {reg: 'is',handler: function (text) {return {yytext: text,type: text,value: text,};},}, // prettier-ignore
   {reg: 'null',handler: function (text) {return {yytext: text,type: text,value: null,};},}, // prettier-ignore
+  {reg: 'cast',handler: function (text) {return {yytext: text,type: text,value: text,};},}, // prettier-ignore
+  {reg: 'string',handler: function (text) {return {yytext: text,type: 'type',value: text,};},}, // prettier-ignore
+  {reg: 'number',handler: function (text) {return {yytext: text,type: 'type',value: text,};},}, // prettier-ignore
+  {reg: 'boolean',handler: function (text) {return {yytext: text,type: 'type',value: text,};},}, // prettier-ignore
   // prettier-ignore
   {reg: '[_a-zA-Z][a-zA-Z0-9_]*',handler: function (text) {return {yytext: text,type: 'id',value: text,};},}, //id的优先级最低,避免把关键字识别成id
   {
