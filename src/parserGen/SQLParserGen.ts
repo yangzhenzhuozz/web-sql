@@ -1,13 +1,14 @@
 import fs from 'fs';
 import { Grammar, default as TSCC } from 'tscc-lr1';
-import { ExpNode, SelectList, WindowFrame } from '../tools/ExpTree.js';
+import { ExpNode, SelectClause, WindowFrame } from '../tools/ExpTree.js';
+import { NeedGroupError } from '../tools/NeedGroupError.js';
 
 declare function isWindowFrame(obj: ExpNode | WindowFrame): obj is WindowFrame;
 
 declare interface DataSet<T> {
   data: T[];
   alias(name: string): DataSet<T>;
-  select(exps: (ExpNode | WindowFrame)[]): DataSet<any>;
+  select(select_caluse: SelectClause): DataSet<any>;
   where(exp: ExpNode): DataSet<T>;
   groupBy(exps: ExpNode[]): DataSet<any>;
   orderBy(exps: ExpNode[]): DataSet<any>;
@@ -25,7 +26,7 @@ declare interface SQLSession {
 declare let Context: SQLSession;
 function gen() {
   let grammar: Grammar = {
-    userCode: `//这个文件用SQLParserGen.ts生成的\nimport { isWindowFrame } from '../tools/assert.js';`,
+    userCode: `//这个文件用SQLParserGen.ts生成的\nimport { isWindowFrame } from '../tools/assert.js';\nimport { NeedGroupError } from '../tools/NeedGroupError.js';`,
     tokens: [
       '.',
       'partition',
@@ -74,6 +75,8 @@ function gen() {
       'string',
       'cast',
       'type',
+      'distinct',
+      'all',
     ],
     association: [
       { left: ['not'] },
@@ -100,7 +103,7 @@ function gen() {
       {
         'query:select_clause from tableView where_clause group_clause order_clause limit_clause': {
           action: function ($): DataSet<any> {
-            let select_clause = $[0] as SelectList;
+            let select_clause = $[0] as SelectClause;
             let tableView = $[2] as DataSet<any>;
             let where_clause = $[3] as ExpNode | undefined;
             let group_clause = $[4] as ExpNode | undefined;
@@ -140,7 +143,23 @@ function gen() {
               }
             }
 
-            tableView = tableView.select(select_clause.nodes!);
+            try {
+              tableView = tableView.select(select_clause);
+            } catch (e) {
+              //如果是还没有分组就使用聚合函数，则为其添加一个group子句
+              if (e instanceof NeedGroupError) {
+                tableView = tableView.groupBy([
+                  {
+                    op: 'immediate_val',
+                    value: 1,
+                    targetName: '1',
+                  },
+                ]);
+                tableView = tableView.select(select_clause);
+              } else {
+                throw e;
+              }
+            }
 
             if (order_clause != undefined) {
               tableView = tableView.orderBy(order_clause);
@@ -151,10 +170,11 @@ function gen() {
         },
       },
       {
-        'select_clause:select select_list': {
-          action: function ($): SelectList {
+        'select_clause:select modifier select_list': {
+          action: function ($): SelectClause {
             return {
-              nodes: $[1] as ExpNode[],
+              modifier: $[1] as 'distinct' | 'all' | undefined,
+              nodes: $[2] as ExpNode[],
             };
           },
         },
@@ -919,10 +939,11 @@ function gen() {
         },
       },
       {
-        'call:id ( argu_list )': {
+        'call:id ( modifier argu_list )': {
           action: function ($): ExpNode {
             let id = $[0] as string;
-            let args = $[2] as ExpNode[];
+            let modifier = $[2] as 'distinct' | 'all' | undefined;
+            let args = $[3] as ExpNode[];
             let argNames = '';
             for (let i = 0; i < args.length; i++) {
               if (i == 0) {
@@ -935,6 +956,7 @@ function gen() {
               op: 'call',
               value: id,
               children: args,
+              modifier: modifier,
               targetName: `${id}(${argNames})`,
             };
           },
@@ -960,6 +982,23 @@ function gen() {
         'argu_list:exp': {
           action: function ($): ExpNode[] {
             return [$[0] as ExpNode];
+          },
+        },
+      },
+      {
+        'modifier:': {},
+      },
+      {
+        'modifier:distinct': {
+          action: function () {
+            return 'distinct';
+          },
+        },
+      },
+      {
+        'modifier:all': {
+          action: function () {
+            return 'all';
           },
         },
       },

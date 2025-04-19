@@ -8,6 +8,9 @@ let rules: LexerRule<YYTOKEN>[] = [
   {reg: 'partition',handler: function (text) {return {yytext: text,type: text,value: text,};},}, // prettier-ignore
   {reg: 'over',handler: function (text) {return {yytext: text,type: text,value: text,};},}, // prettier-ignore
 
+  {reg: 'distinct',handler: function (text) {return {yytext: text,type: text,value: text,};},}, // prettier-ignore
+  {reg: 'all',handler: function (text) {return {yytext: text,type: text,value: text,};},}, // prettier-ignore
+  
   {reg: 'case',handler: function (text) {return {yytext: text,type: text,value: text,};},}, // prettier-ignore
   {reg: 'when',handler: function (text) {return {yytext: text,type: text,value: text,};},}, // prettier-ignore
   {reg: 'from',handler: function (text) {return {yytext: text,type: text,value: text,};},}, // prettier-ignore
@@ -57,10 +60,13 @@ let rules: LexerRule<YYTOKEN>[] = [
   {reg: 'boolean',handler: function (text) {return {yytext: text,type: 'type',value: text,};},}, // prettier-ignore
   // prettier-ignore
   {reg: '[_a-zA-Z\\u4E00-\\u9FFF][a-zA-Z0-9_\\u4E00-\\u9FFF]*',handler: function (text) {return {yytext: text,type: 'id',value: text,};},}, //id的优先级最低,避免把关键字识别成id
-{reg: '`[^`]*`',handler: function (text) {
-let id=text.slice(1,-1);
-return {yytext: id,type: 'id',value: id,};
-},}, //id的优先级最低,避免把关键字识别成id
+  {
+    reg: '`[^`]*`',
+    handler: function (text) {
+      let id = text.slice(1, -1);
+      return { yytext: id, type: 'id', value: id };
+    },
+  }, //id的优先级最低,避免把关键字识别成id
   {
     reg: '[0-9]+\\.[0-9]+',
     handler: function (text) {

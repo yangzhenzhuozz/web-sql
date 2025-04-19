@@ -1,6 +1,6 @@
 import { assert } from './assert.js';
 import { DataSet, UDF, UDFHanler } from './DataSet.js';
-import { valueType } from './ExpTree.js';
+// import { valueType } from './ExpTree.js';
 import { Lexical } from './Lexical.js';
 import Parse from './SQLParser.js';
 export class SQLSession {
@@ -16,15 +16,43 @@ export class SQLSession {
     },
     count: {
       type: 'aggregate',
-      handler: (list) => {
-        return list.length;
+      handler: (list, modifier?: 'distinct' | 'all') => {
+        if (list === undefined) {
+          throw `count函数的参数不能为空`;
+        }
+        if (list[0].length > 1) {
+          throw `count函数的参数只能有一个`;
+        }
+        if (modifier === 'all') {
+          throw `还不支持modifier:all`;
+        } else if (modifier === 'distinct') {
+          let set = new Set(list.map((item) => item[0]));
+          return set.size;
+        } else {
+          return list.length;
+        }
       },
     },
     sum: {
       type: 'aggregate',
-      handler: (list) => {
+      handler: (list, modifier?: 'distinct' | 'all') => {
+        if (list === undefined) {
+          throw `sum函数的参数不能为空`;
+        }
+        if (list[0].length > 1) {
+          throw `sum函数的参数只能有一个`;
+        }
+        
         assert(typeof list[0][0] == 'number', 'sum只能累加数字');
-        return list.map((item) => item[0]).reduce((p, c) => <number>p + <number>c); //只取第一列的值累加
+
+        if (modifier === 'all') {
+          throw `还不支持modifier:all`;
+        } else if (modifier === 'distinct') {
+          let set = new Set(list.map((item) => item[0]));
+          return [...set].reduce((p, c) => <number>p + <number>c); //只取第一列的值累加
+        } else {
+          return list.map((item) => item[0]).reduce((p, c) => <number>p + <number>c); //只取第一列的值累加
+        }
       },
     },
     row_number: {

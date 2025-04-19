@@ -1,5 +1,6 @@
 import { assert, isWindowFrame } from './assert.js';
-import { ExpNode, valueType, valueTypeList, WindowFrame } from './ExpTree.js';
+import { ExpNode, SelectClause, WindowFrame } from './ExpTree.js';
+import { NeedGroupError } from './NeedGroupError.js';
 import { SQLSession } from './SQLSession.js';
 
 export interface FieldType {
@@ -9,15 +10,15 @@ export interface FieldType {
 export type UDFHanler =
   | {
       type: 'normal';
-      handler: (...args: (valueType | undefined)[]) => valueType | undefined;
+      handler: (...args: any[]) => any | undefined;
     }
   | {
       type: 'aggregate';
-      handler: (list: (valueType | undefined)[][]) => valueType | undefined;
+      handler: (list: any[][], modifier?: 'distinct' | 'all') => any | undefined;
     }
   | {
       type: 'windowFrame';
-      handler: (list: (valueType | undefined)[][]) => valueTypeList | undefined;
+      handler: (list: any[][], modifier?: 'distinct' | 'all') => any | undefined;
     };
 export type UDF = {
   [key: string]: UDFHanler;
@@ -114,7 +115,7 @@ export class DataSet<T extends { [key: string | symbol]: any }> {
     }
 
     let { op, children } = exp;
-    let result: valueType | valueTypeList | undefined = undefined;
+    let result: any | undefined = undefined;
     let l_Child: ExpNode;
     let r_Child: ExpNode;
     switch (op) {
@@ -354,35 +355,36 @@ export class DataSet<T extends { [key: string | symbol]: any }> {
           throw `未定义函数:${fun_name}`;
         }
         if (this.session!.udf[fun_name].type == 'aggregate') {
+          //如果还没有开窗，则抛出一个特殊异常
           if (row[Symbol.for('@frameGroupValues')] === undefined) {
-            throw `还没有group by或者开窗不能使用聚合函数${fun_name}`;
+            throw new NeedGroupError();
           } else {
-            let list = [] as valueType[][];
+            let list = [] as any[][];
             for (let subLine of row[Symbol.for('@frameGroupValues')]) {
               let args = [];
               for (let child of children!) {
-                let arg = this.execExp(child, subLine).value! as valueType;
+                let arg = this.execExp(child, subLine).value! as any;
                 args.push(arg);
               }
               list.push(args);
             }
-            result = this.session!.udf[fun_name].handler(list);
+            result = this.session!.udf[fun_name].handler(list, exp.modifier);
           }
         } else if (this.session!.udf[fun_name].type == 'normal') {
-          let args: (valueType | undefined)[] = [];
+          let args: any[] = [];
           for (let c of children!) {
-            args.push(this.execExp(c, row).value as valueType | undefined);
+            args.push(this.execExp(c, row).value as any);
           }
           result = this.session!.udf[fun_name].handler(...args);
         } else {
           if (row[Symbol.for('@frameGroupValues')] === undefined) {
             throw `还没有开窗,不能使用窗口函数${fun_name}`;
           } else {
-            let list = [] as valueType[][];
+            let list = [] as any[][];
             for (let subLine of row[Symbol.for('@frameGroupValues')]) {
               let args = [];
               for (let child of children!) {
-                let arg = this.execExp(child, subLine).value! as valueType;
+                let arg = this.execExp(child, subLine).value! as any;
                 args.push(arg);
               }
               list.push(args);
@@ -480,7 +482,8 @@ export class DataSet<T extends { [key: string | symbol]: any }> {
     return new DataSet(this.data, name, this.session);
   }
 
-  public select(exps: (ExpNode | WindowFrame)[]): DataSet<any> {
+  public select(select_clause: SelectClause): DataSet<any> {
+    let exps = select_clause.nodes;
     let arr = [] as any[];
     let windowFrames = [] as WindowFrame[];
     for (let row_idx = 0; row_idx < this.data.length; row_idx++) {
@@ -508,6 +511,22 @@ export class DataSet<T extends { [key: string | symbol]: any }> {
       }
       arr.push(tmpRow);
     }
+    if (select_clause.modifier === 'all') {
+      throw `不支持all`;
+    } else if (select_clause.modifier === 'distinct') {
+      let distinct_nodes = [] as ExpNode[];
+      for (let k in arr[0]) {
+        distinct_nodes.push({
+          op: 'getfield',
+          value: k,
+          targetName: k,
+        });
+      }
+      //这里的递归调用保证select不会再使用modifier，所以不会变成无线递归
+      arr = new DataSet(arr, undefined, this.session).groupBy(distinct_nodes).select({ nodes: distinct_nodes }).data; //使用group by去重
+    }
+
+    console.log(`${select_clause.modifier}`);
 
     let ds = new DataSet(arr, undefined, this.session);
     ds.tableNameToField = this.tableNameToField; //select不更新tableNameToField
@@ -533,7 +552,7 @@ export class DataSet<T extends { [key: string | symbol]: any }> {
               row[windowFrame.alias ?? windowFrame.targetName] = aggregateVal;
             }
           } else if (ds.session!.udf[windowFrame.windowFunction.value! as string].type == 'windowFrame') {
-            let windowFrameVals = ds.execExp(windowFrame.windowFunction, line).value as valueTypeList;
+            let windowFrameVals = ds.execExp(windowFrame.windowFunction, line).value as any[];
             for (let i = 0; i < windowFrameVals.length; i++) {
               frame[i][windowFrame.alias ?? windowFrame.targetName] = windowFrameVals[i];
             }
@@ -568,7 +587,7 @@ export class DataSet<T extends { [key: string | symbol]: any }> {
     for (let i = 0; i < this.data.length; i++) {
       let row = this.data[i];
       let tmpRow = { ...row } as any;
-      let groupValues = [] as valueType[];
+      let groupValues = [] as any[];
       for (let exp of exps) {
         let cell = this.execExp(exp, row);
         //如果表名或者字段名无效,在execExp这里就抛出异常了
@@ -581,7 +600,7 @@ export class DataSet<T extends { [key: string | symbol]: any }> {
         }
 
         tmpRow[Symbol.for(cell.targetName)] = cell.value!;
-        groupValues.push(cell.value! as valueType);
+        groupValues.push(cell.value! as any);
       }
       tmpRow[Symbol.for('@groupKeys')] = groupValues.map((item) => item?.toString()).reduce((p, c) => p + ',' + c);
       ds.push(tmpRow);
